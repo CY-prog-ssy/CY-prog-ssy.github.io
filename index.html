@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Airplane · 个人博客</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:        #0a0d12;
+    --bg-2:      #0d1117;
+    --card:      #11161d;
+    --card-hover:#151b24;
+    --border:    #1e242e;
+    --border-2:  #2b3341;
+    --fg:        #c9d1d9;
+    --fg-2:      #8b949e;
+    --fg-3:      #6e7681;
+    --accent:    #7ee787;
+    --accent-2:  #2ea043;
+    --cyan:      #79c0ff;
+    --yellow:    #e3b341;
+    --magenta:   #d2a8ff;
+    --radius:    14px;
+    --mono:      'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans:      'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  *{ box-sizing:border-box; }
+
+  html{ scroll-behavior:smooth; }
+
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--fg);
+    font-family:var(--sans);
+    font-size:15px;
+    line-height:1.8;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+
+  /* 背景光晕 */
+  body::before{
+    content:'';
+    position:fixed;
+    inset:0;
+    pointer-events:none;
+    z-index:0;
+    background:
+      radial-gradient(700px 400px at 12% -5%, rgba(126,231,135,.07), transparent 65%),
+      radial-gradient(600px 500px at 95% 8%, rgba(121,192,255,.06), transparent 60%),
+      radial-gradient(800px 600px at 50% 110%, rgba(210,168,255,.05), transparent 60%);
+  }
+
+  /* 细网格 */
+  body::after{
+    content:'';
+    position:fixed;
+    inset:0;
+    pointer-events:none;
+    z-index:0;
+    opacity:.35;
+    background-image:
+      linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px);
+    background-size:52px 52px;
+    mask-image:radial-gradient(circle at 50% 0%, #000 0%, transparent 75%);
+    -webkit-mask-image:radial-gradient(circle at 50% 0%, #000 0%, transparent 75%);
+  }
+
+  .wrap{ position:relative; z-index:1; }
+
+  a{ color:inherit; text-decoration:none; }
+
+  .container{
+    width:min(1180px, 100% - 48px);
+    margin-inline:auto;
+  }
+
+  /* ================= 导航 ================= */
+  .nav{
+    position:sticky;
+    top:0;
+    z-index:50;
+    border-bottom:1px solid transparent;
+    background:rgba(10,13,18,.72);
+    backdrop-filter:blur(14px) saturate(160%);
+    -webkit-backdrop-filter:blur(14px) saturate(160%);
+    transition:border-color .3s, background .3s;
+  }
+  .nav.scrolled{
+    border-bottom-color:var(--border);
+    background:rgba(10,13,18,.9);
+  }
+  .nav-inner{
+    height:64px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:24px;
+  }
+  .logo{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    font-family:var(--mono);
+    font-weight:700;
+    font-size:15px;
+    letter-spacing:-.2px;
+  }
+  .logo-mark{
+    width:28px; height:28px;
+    display:grid; place-items:center;
+    border-radius:8px;
+    border:1px solid var(--border-2);
+    background:linear-gradient(145deg,#161d26,#0c1116);
+    color:var(--accent);
+    font-size:14px;
+    box-shadow:0 0 18px -8px var(--accent);
+  }
+  .logo .dim{ color:var(--fg-3); font-weight:400; }
+
+  .nav-links{
+    display:flex;
+    align-items:center;
+    gap:4px;
+    font-size:14px;
+  }
+  .nav-links a{
+    padding:7px 13px;
+    border-radius:8px;
+    color:var(--fg-2);
+    transition:color .18s, background .18s;
+  }
+  .nav-links a:hover{ color:var(--fg); background:rgba(255,255,255,.045); }
+  .nav-links a.active{ color:var(--accent); }
+
+  .nav-cta{
+    display:flex; align-items:center; gap:9px;
+    font-family:var(--mono);
+    font-size:12.5px;
+    color:var(--fg-2);
+    padding:7px 13px;
+    border:1px solid var(--border-2);
+    border-radius:9px;
+    transition:.2s;
+  }
+  .nav-cta:hover{
+    color:var(--accent);
+    border-color:color-mix(in srgb, var(--accent) 45%, transparent);
+    box-shadow:0 0 22px -10px var(--accent);
+  }
+  .nav-cta .dot-live{
+    width:6px; height:6px; border-radius:50%;
+    background:var(--accent);
+    box-shadow:0 0 8px var(--accent);
+    animation:pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse{
+    0%,100%{ opacity:1; transform:scale(1); }
+    50%    { opacity:.35; transform:scale(.8); }
+  }
+
+  /* ================= HERO ================= */
+  .hero{
+    display:grid;
+    grid-template-columns:1.05fr .95fr;
+    gap:64px;
+    align-items:center;
+    padding:76px 0 88px;
+  }
+
+  .badge{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    padding:5px 12px;
+    border:1px solid var(--border-2);
+    border-radius:100px;
+    background:rgba(126,231,135,.05);
+    color:var(--accent);
+    font-family:var(--mono);
+    font-size:11.5px;
+    letter-spacing:.4px;
+    margin-bottom:22px;
+  }
+
+  .hero h1{
+    margin:0 0 20px;
+    font-size:clamp(34px, 5vw, 52px);
+    line-height:1.2;
+    font-weight:900;
+    letter-spacing:-1.2px;
+  }
+  .hero h1 .grad{
+    background:linear-gradient(100deg, var(--accent) 0%, var(--cyan) 55%, var(--magenta) 100%);
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
+  }
+
+  .hero p.lead{
+    margin:0 0 30px;
+    font-size:16.5px;
+    line-height:1.85;
+    color:var(--fg-2);
+    max-width:52ch;
+  }
+
+  .hero-actions{ display:flex; gap:12px; flex-wrap:wrap; margin-bottom:34px; }
+
+  .btn{
+    display:inline-flex;
+    align-items:center;
+    gap:9px;
+    padding:11px 22px;
+    border-radius:10px;
+    font-size:14px;
+    font-weight:500;
+    transition:.22s;
+    border:1px solid transparent;
+  }
+  .btn-primary{
+    background:linear-gradient(180deg, #2ea043, #238636);
+    color:#fff;
+    box-shadow:0 8px 24px -12px #2ea043, inset 0 1px 0 rgba(255,255,255,.14);
+  }
+  .btn-primary:hover{
+    transform:translateY(-2px);
+    box-shadow:0 14px 32px -12px #2ea043, inset 0 1px 0 rgba(255,255,255,.2);
+  }
+  .btn-ghost{
+    border-color:var(--border-2);
+    color:var(--fg-2);
+    background:rgba(255,255,255,.02);
+  }
+  .btn-ghost:hover{
+    color:var(--fg);
+    border-color:var(--fg-3);
+    transform:translateY(-2px);
+  }
+
+  .hero-stats{
+    display:flex;
+    gap:38px;
+    padding-top:26px;
+    border-top:1px solid var(--border);
+  }
+  .stat b{
+    display:block;
+    font-family:var(--mono);
+    font-size:22px;
+    font-weight:700;
+    color:var(--accent);
+    line-height:1.3;
+  }
+  .stat span{
+    font-size:12.5px;
+    color:var(--fg-3);
+    letter-spacing:.3px;
+  }
+
+  /* ================= 终端装饰窗 ================= */
+  .term{
+    position:relative;
+    border:1px solid var(--border-2);
+    border-radius:12px;
+    background:rgba(1,4,9,.9);
+    box-shadow:
+      0 30px 70px -28px rgba(0,0,0,.95),
+      0 0 80px -45px var(--accent),
+      inset 0 1px 0 rgba(255,255,255,.04);
+    overflow:hidden;
+    backdrop-filter:blur(8px);
+    animation:float 7s ease-in-out infinite;
+  }
+  @keyframes float{
+    0%,100%{ transform:translateY(0); }
+    50%    { transform:translateY(-9px); }
+  }
+
+  .term::before{
+    content:'';
+    position:absolute;
+    top:0; left:0; right:0;
+    height:1px;
+    background:linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity:.7;
+  }
+  .term::after{
+    content:'';
+    position:absolute;
+    inset:0;
+    pointer-events:none;
+    background:repeating-linear-gradient(0deg, rgba(0,0,0,.22) 0 1px, transparent 1px 3px);
+    opacity:.35;
+    z-index:5;
+  }
+
+  .term-bar{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    padding:11px 14px;
+    background:linear-gradient(#161c24,#0e1319);
+    border-bottom:1px solid var(--border);
+    user-select:none;
+  }
+  .term-dot{ width:11px; height:11px; border-radius:50%; flex:none; }
+  .term-dot.r{ background:#ff5f57; }
+  .term-dot.y{ background:#febc2e; }
+  .term-dot.g{ background:#28c840; }
+  .term-title{
+    margin-left:auto;
+    font-family:var(--mono);
+    font-size:11.5px;
+    color:var(--fg-3);
+    letter-spacing:.2px;
+  }
+
+  .term-body{
+    position:relative;
+    z-index:2;
+    padding:18px 18px 22px;
+    font-family:var(--mono);
+    font-size:13px;
+    line-height:1.85;
+    height:300px;
+    overflow:hidden;
+  }
+  .term-body .row{ white-space:pre-wrap; word-break:break-word; }
+  .term-body .ps1{ color:var(--accent); }
+  .term-body .pth{ color:var(--cyan); }
+  .term-body .cmd{ color:var(--fg); }
+  .term-body .out{ color:var(--fg-2); }
+  .term-body .hi { color:var(--accent); }
+  .term-body .yl { color:var(--yellow); }
+  .term-body .mg { color:var(--magenta); }
+
+  .cursor{
+    display:inline-block;
+    width:8px;
+    height:14px;
+    vertical-align:-2px;
+    background:var(--accent);
+    box-shadow:0 0 8px var(--accent);
+    animation:blink 1s steps(1) infinite;
+  }
+  @keyframes blink{ 0%,50%{opacity:1;} 50.01%,100%{opacity:0;} }
+
+  /* ================= 关于区块（单列适配） ================= */
+  .about-grid{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:20px;
+    padding-bottom:40px;
+    max-width:800px;
+  }
+
+  .card{
+    padding:24px;
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    background:linear-gradient(180deg, var(--card), rgba(17,22,29,.55));
+    transition:border-color .25s, transform .25s;
+  }
+  .card:hover{ border-color:var(--border-2); }
+
+  .card h4{
+    margin:0 0 16px;
+    font-size:12.5px;
+    font-weight:700;
+    letter-spacing:.7px;
+    text-transform:uppercase;
+    color:var(--fg-3);
+    font-family:var(--mono);
+  }
+
+  .profile{ display:flex; align-items:center; gap:15px; margin-bottom:18px; }
+  .avatar{
+    width:56px;
+    height:56px;
+    flex:none;
+    border-radius:16px;
+    object-fit:cover;
+    box-shadow:0 0 26px -10px var(--accent);
+  }
+  .profile-meta b{ display:block; font-size:17px; font-weight:700; line-height:1.5; }
+  .profile-meta span{
+    font-family:var(--mono);
+    font-size:12px;
+    color:var(--fg-3);
+  }
+  .card p.bio{
+    margin:0;
+    font-size:14px;
+    line-height:1.9;
+    color:var(--fg-2);
+  }
+
+  /* ================= 标签与链接（作品之后） ================= */
+  .tags-links-section{ padding-bottom:78px; }
+
+  .tags-links-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:20px;
+  }
+
+  .tag-cloud{ display:flex; flex-wrap:wrap; gap:8px; }
+  .tag-cloud a{
+    padding:5px 12px;
+    border-radius:8px;
+    border:1px solid var(--border);
+    background:rgba(255,255,255,.02);
+    font-family:var(--mono);
+    font-size:11.5px;
+    color:var(--fg-2);
+    transition:.18s;
+  }
+  .tag-cloud a:hover{
+    color:var(--accent);
+    border-color:rgba(126,231,135,.4);
+    background:rgba(126,231,135,.07);
+  }
+
+  .list-link{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:10px 0;
+    font-size:14px;
+    color:var(--fg-2);
+    border-bottom:1px dashed var(--border);
+    transition:color .18s, padding-left .18s;
+  }
+  .list-link:last-child{ border-bottom:0; padding-bottom:0; }
+  .list-link:hover{ color:var(--accent); padding-left:5px; }
+  .list-link .arrow{ font-family:var(--mono); color:var(--fg-3); font-size:11px; }
+  .list-link .val{
+    margin-left:auto;
+    font-family:var(--mono);
+    font-size:11.5px;
+    color:var(--fg-3);
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    max-width:150px;
+  }
+  .list-link:hover .val{ color:var(--accent); }
+
+  /* ================= 作品栏 ================= */
+  .works-section{ padding-bottom:72px; }
+
+  .works-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(320px, 1fr));
+    gap:20px;
+  }
+
+  .work-card{
+    position:relative;
+    display:flex;
+    flex-direction:column;
+    padding:26px 28px 24px;
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    background:linear-gradient(180deg, var(--card), rgba(17,22,29,.6));
+    transition:border-color .25s, transform .25s, background .25s, box-shadow .25s;
+    overflow:hidden;
+  }
+  .work-card::before{
+    content:'';
+    position:absolute;
+    left:0; top:0; bottom:0;
+    width:2px;
+    background:linear-gradient(180deg, var(--cyan), transparent 70%);
+    opacity:0;
+    transition:opacity .25s;
+  }
+  .work-card:hover{
+    border-color:var(--border-2);
+    background:linear-gradient(180deg, var(--card-hover), rgba(21,27,36,.7));
+    transform:translateY(-3px);
+    box-shadow:0 20px 44px -26px rgba(0,0,0,.9);
+  }
+  .work-card:hover::before{ opacity:1; }
+
+  .work-icon{
+    width:44px; height:44px;
+    display:grid; place-items:center;
+    border-radius:12px;
+    border:1px solid var(--border-2);
+    background:linear-gradient(145deg,#161d26,#0c1116);
+    font-size:20px;
+    margin-bottom:16px;
+    box-shadow:0 0 22px -10px var(--cyan);
+  }
+
+  .work-card h3{
+    margin:0 0 10px;
+    font-size:18px;
+    font-weight:700;
+    line-height:1.5;
+    letter-spacing:-.3px;
+    transition:color .2s;
+  }
+  .work-card:hover h3{ color:var(--cyan); }
+
+  .work-card p{
+    margin:0 0 20px;
+    font-size:14px;
+    line-height:1.85;
+    color:var(--fg-2);
+    flex:1;
+  }
+
+  .work-tags{
+    display:flex;
+    flex-wrap:wrap;
+    gap:7px;
+    margin-bottom:18px;
+  }
+  .work-tags span{
+    padding:3px 10px;
+    border-radius:100px;
+    border:1px solid rgba(121,192,255,.22);
+    background:rgba(121,192,255,.07);
+    color:var(--cyan);
+    font-family:var(--mono);
+    font-size:10.5px;
+    letter-spacing:.2px;
+  }
+
+  .work-link{
+    display:inline-flex;
+    align-items:center;
+    gap:7px;
+    font-family:var(--mono);
+    font-size:12.5px;
+    color:var(--fg-3);
+    transition:color .2s, gap .2s;
+    align-self:flex-start;
+  }
+  .work-card:hover .work-link{ color:var(--cyan); gap:11px; }
+
+  /* ================= 文章列表（页面最底部） ================= */
+  .posts-section{ padding-bottom:100px; }
+
+  .section-head{
+    display:flex;
+    align-items:baseline;
+    gap:14px;
+    margin-bottom:32px;
+    padding-bottom:16px;
+    border-bottom:1px solid var(--border);
+  }
+  .section-head h2{
+    margin:0;
+    font-size:21px;
+    font-weight:700;
+    letter-spacing:-.3px;
+  }
+  .section-head h2::before{
+    content:'#';
+    font-family:var(--mono);
+    color:var(--accent);
+    margin-right:9px;
+    opacity:.8;
+  }
+  .section-head .count{
+    margin-left:auto;
+    font-family:var(--mono);
+    font-size:12px;
+    color:var(--fg-3);
+  }
+
+  .posts{ display:flex; flex-direction:column; gap:16px; }
+
+  .post{
+    position:relative;
+    display:block;
+    padding:28px 32px;
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    background:linear-gradient(180deg, var(--card), rgba(17,22,29,.6));
+    transition:border-color .25s, transform .25s, background .25s, box-shadow .25s;
+    overflow:hidden;
+  }
+  .post::before{
+    content:'';
+    position:absolute;
+    left:0; top:0; bottom:0;
+    width:2px;
+    background:linear-gradient(180deg, var(--accent), transparent 70%);
+    opacity:0;
+    transition:opacity .25s;
+  }
+  .post:hover{
+    border-color:var(--border-2);
+    background:linear-gradient(180deg, var(--card-hover), rgba(21,27,36,.7));
+    transform:translateY(-3px);
+    box-shadow:0 20px 44px -26px rgba(0,0,0,.9);
+  }
+  .post:hover::before{ opacity:1; }
+
+  .post-top{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-bottom:12px;
+    font-family:var(--mono);
+    font-size:11.5px;
+    color:var(--fg-3);
+  }
+  .post-date{ letter-spacing:.3px; }
+  .post-sep{ color:var(--border-2); }
+  .tag{
+    padding:2px 9px;
+    border-radius:100px;
+    border:1px solid rgba(126,231,135,.22);
+    background:rgba(126,231,135,.07);
+    color:var(--accent);
+    font-size:11px;
+    letter-spacing:.2px;
+  }
+
+  .post h3{
+    margin:0 0 10px;
+    font-size:20px;
+    font-weight:700;
+    line-height:1.5;
+    letter-spacing:-.3px;
+    transition:color .2s;
+  }
+  .post:hover h3{ color:var(--accent); }
+
+  .post p{
+    margin:0 0 16px;
+    font-size:14.5px;
+    line-height:1.85;
+    color:var(--fg-2);
+    max-width:78ch;
+  }
+
+  .post-more{
+    display:inline-flex;
+    align-items:center;
+    gap:7px;
+    font-family:var(--mono);
+    font-size:12.5px;
+    color:var(--fg-3);
+    transition:color .2s, gap .2s;
+  }
+  .post:hover .post-more{ color:var(--accent); gap:11px; }
+
+  /* ================= 页脚 ================= */
+  footer{
+    border-top:1px solid var(--border);
+    padding:34px 0 46px;
+  }
+  .foot{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:20px;
+    flex-wrap:wrap;
+    font-family:var(--mono);
+    font-size:12.5px;
+    color:var(--fg-3);
+  }
+  .foot-links{ display:flex; gap:20px; }
+  .foot-links a{ transition:color .18s; }
+  .foot-links a:hover{ color:var(--accent); }
+
+  /* ================= 响应式 ================= */
+  @media (max-width:1000px){
+    .hero{
+      grid-template-columns:1fr;
+      gap:48px;
+      padding:52px 0 64px;
+    }
+  }
+
+  @media (max-width:640px){
+    .container{ width:calc(100% - 32px); }
+    .nav-links a{ padding:6px 9px; font-size:13px; }
+    .nav-cta{ display:none; }
+    .hero{ padding:36px 0 52px; }
+    .hero-stats{ gap:26px; }
+    .card{ padding:20px; }
+    .post{ padding:22px; }
+    .post h3{ font-size:17.5px; }
+    .term-body{ height:250px; font-size:12px; padding:14px; }
+    .posts-section{ padding-bottom:64px; }
+    .list-link .val{ max-width:110px; }
+    .works-grid{ grid-template-columns:1fr; }
+    .work-card{ padding:22px; }
+    .work-card h3{ font-size:16.5px; }
+    .works-section{ padding-bottom:56px; }
+    
+    /* 响应式：标签和链接变为单列 */
+    .tags-links-grid{ grid-template-columns:1fr; }
+    .tags-links-section{ padding-bottom:56px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <!-- ================= 导航 ================= -->
+  <header class="nav" id="nav">
+    <div class="container nav-inner">
+      <a href="#" class="logo">
+        <span class="logo-mark">&gt;_</span>
+        <span>Airplane<span class="dim">.dev</span></span>
+      </a>
+      <nav class="nav-links">
+        <a href="#about" class="active">关于</a>
+        <a href="#works">作品</a>
+        <a href="#posts">文章</a>
+      </nav>
+      <a href="#links" class="nav-cta">
+        <span class="dot-live"></span>
+        RSS 订阅
+      </a>
+    </div>
+  </header>
+
+  <main>
+    <!-- ================= HERO ================= -->
+    <section class="container hero">
+      <div class="hero-text">
+        <div class="badge">
+          <span class="dot-live" style="width:5px;height:5px;border-radius:50%;background:currentColor;box-shadow:0 0 8px currentColor;"></span>
+          现在不可以联系我
+        </div>
+
+        <h1>
+          写代码，<br>
+          也写<span class="grad">一些别的</span>。
+        </h1>
+
+        <p class="lead">
+          我是 Airplane，一名在校初二学生，现居河北，
+          晚上研究 CSS 和终端美学，偶尔把想不明白的事情写下来。
+        </p>
+
+        <div class="hero-actions">
+          <a href="#about" class="btn btn-primary">
+            <span>关于我</span>
+            <span style="font-family:var(--mono);font-size:12px;">↓</span>
+          </a>
+          <!-- 新增作品按钮 -->
+          <a href="#works" class="btn btn-ghost">查看作品</a>
+          <a href="#posts" class="btn btn-ghost">直接看文章</a>
+        </div>
+
+        <div class="hero-stats">
+          <div class="stat"><b>   3</b><span>个作品</span></div>
+          <div class="stat"><b>   1</b><span>篇文章</span></div>
+          <div class="stat"><b>   0</b><span>杯咖啡</span></div>
+        </div>
+      </div>
+
+      <!-- 终端装饰窗 -->
+      <div class="term" aria-hidden="true">
+        <div class="term-bar">
+          <span class="term-dot r"></span>
+          <span class="term-dot y"></span>
+          <span class="term-dot g"></span>
+          <span class="term-title">visitor@blog: ~</span>
+        </div>
+        <div class="term-body" id="termBody"></div>
+      </div>
+    </section>
+
+    <!-- ================= 关于（单列显示） ================= -->
+    <section class="container about-grid" id="about">
+      <div class="card">
+        <h4>关于我</h4>
+        <div class="profile">
+          <img class="avatar" src="ttx.jpg" alt="Airplane 的头像">
+          <div class="profile-meta">
+            <b>Airplane</b>
+            <span>Frontend Engineer · 河北</span>
+          </div>
+        </div>
+        <p class="bio">
+          喜欢终端、等，以及一切有确定性的东西。
+          座右铭是「能自动化的事，就不要做第二次」。
+          这个博客从配色到布局都是手写的，没有用任何框架。
+        </p>
+      </div>
+    </section>
+
+    <!-- ================= 作品栏 ================= -->
+    <section class="container works-section" id="works">
+      <div class="section-head">
+        <h2>作品</h2>
+        <span class="count">total 3</span>
+      </div>
+
+      <div class="works-grid">
+        <div class="work-card">
+          <div class="work-icon">🔊</div>
+          <h3>手机警报器</h3>
+          <p>
+            一个纯前端的警报音效模拟器。包含号角、气笛、战术警灯、
+            巡航警报、救护双音等多种模式，支持全局混响与三段均衡器实时调节，
+            所有音效均可点按触发或长按爬升，还带一键全停和自动随机轮换。
+          </p>
+          <div class="work-tags">
+            <span>Web Audio</span>
+            <span>音效</span>
+            <span>交互</span>
+          </div>
+          <a href="https://17tx.byethost9.com/tg/1/32/" target="_blank" rel="noopener" class="work-link">
+            打开作品 <span>→</span>
+          </a>
+        </div>
+
+        <div class="work-card">
+          <div class="work-icon">🪟</div>
+          <h3>Windows XP 模拟器</h3>
+          <p>
+            在浏览器里复刻的 Windows XP 桌面环境。包含我的电脑、我的文档、
+            回收站、IE、记事本、计算器和扫雷等经典组件，能看到 C/D 盘容量、
+            软驱和 DVD 驱动器信息，甚至连开机和关机画面都还原了。
+          </p>
+          <div class="work-tags">
+            <span>Windows XP</span>
+            <span>模拟器</span>
+            <span>怀旧</span>
+          </div>
+          <a href="https://17tx.byethost9.com/tg/1/51/" target="_blank" rel="noopener" class="work-link">
+            打开作品 <span>→</span>
+          </a>
+        </div>
+
+        <!-- 新增：Windows 11 模拟器 -->
+        <div class="work-card">
+          <div class="work-icon">🪟</div>
+          <h3>Windows 11 模拟器</h3>
+          <p>
+            在浏览器里复刻的 Windows 11 桌面环境。包含开始菜单、任务栏、
+            小组件、文件资源管理器、Microsoft Edge、记事本和计算器等核心组件，
+            支持深色/浅色主题切换，并还原了专注助手和通知中心等细节。
+          </p>
+          <div class="work-tags">
+            <span>Windows 11</span>
+            <span>模拟器</span>
+            <span>桌面环境</span>
+          </div>
+          <a href="https://17tx.byethost9.com/tg/1/53/" target="_blank" rel="noopener" class="work-link">
+            打开作品 <span>→</span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 标签与找到我（放在作品后面） ================= -->
+    <section class="container tags-links-section">
+      <div class="section-head">
+        <h2>标签与链接</h2>
+        <span class="count">tags & links</span>
+      </div>
+
+      <div class="tags-links-grid">
+        <!-- 标签 -->
+        <div class="card">
+          <h4>标签</h4>
+          <div class="tag-cloud">
+            <a href="#posts">CSS</a>
+            <a href="#posts">JavaScript</a>
+            <a href="#posts">React</a>
+            <a href="#posts">HTML</a>
+            <a href="#posts">Laa</a>
+            <a href="#posts">Windows</a>
+            <a href="#posts">Linux</a>
+            <a href="#posts">Termux</a>
+          </div>
+        </div>
+
+        <!-- 找到我 -->
+        <div class="card" id="links">
+          <h4>找到我</h4>
+          <a href="https://github.com/CY-prog-ssy" target="_blank" rel="noopener" class="list-link">
+            <span class="arrow">↗</span> GitHub
+            <span class="val">CY-prog-ssy</span>
+          </a>
+          <a href="mailto:linyun_135@qq.com" class="list-link">
+            <span class="arrow">↗</span> Email
+            <span class="val">linyun_135@qq.com</span>
+          </a>
+          <a href="#" class="list-link">
+            <span class="arrow">↗</span> RSS 订阅
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 文章列表 ================= -->
+    <section class="container posts-section" id="posts">
+      <div class="section-head">
+        <h2>最新文章</h2>
+        <span class="count">total 1</span>
+      </div>
+
+      <div class="posts">
+        <a href="#" class="post">
+          <div class="post-top">
+            <span class="post-date">2026-010-7-03:02</span>
+            <span class="post-sep">/</span>
+            <span class="tag">CSS</span>
+            <span class="tag">前端</span>
+          </div>
+          <h3>用 CSS 手搓一个终端窗口</h3>
+          <p>
+            终端美学最迷人的地方在于它的克制：一个等宽字体、一种主色、一条光标，
+            就足以构成整个界面。这篇文章记录了我在网页里还原它时踩过的坑。
+          </p>
+          <span class="post-more">
+            阅读全文 <span>→</span>
+          </span>
+        </a>
+      </div>
+    </section>
+  </main>
+
+  <!-- ================= 页脚 ================= -->
+  <footer>
+    <div class="container foot">
+      <span>© 2026 Airplane · 用 HTML 和 CSS 手搓</span>
+      <div class="foot-links">
+        <a href="#about">关于</a>
+        <a href="#works">作品</a>
+        <a href="#posts">文章</a>
+      </div>
+    </div>
+  </footer>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* 导航栏滚动状态 + 高亮当前区块 */
+  var nav = document.getElementById('nav');
+  var links = Array.prototype.slice.call(document.querySelectorAll('.nav-links a'));
+
+  function onScroll() {
+    nav.classList.toggle('scrolled', window.scrollY > 12);
+
+    var pos = window.scrollY + 120;
+    var current = links[0];
+    links.forEach(function (a) {
+      var id = a.getAttribute('href');
+      if (!id || id.charAt(0) !== '#') return;
+      var el = document.querySelector(id);
+      if (el && el.offsetTop <= pos) current = a;
+    });
+    links.forEach(function (a) { a.classList.toggle('active', a === current); });
+  }
+
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  /* 终端装饰窗动画 */
+  var termBody = document.getElementById('termBody');
+  if (!termBody) return;
+
+  var sleep = function (ms) {
+    return new Promise(function (r) { setTimeout(r, ms); });
+  };
+
+  var script = [
+    { t: 'cmd', text: 'whoami' },
+    { t: 'out', html: '<span class="hi">Airplane</span> · 在校初中生' },
+    { t: 'cmd', text: 'cat ~/now.txt' },
+    { t: 'out', html: '想着没事干，于是把博客写了。' },
+    { t: 'cmd', text: 'ls ~/posts' },
+    { t: 'out', html: '<span class="yl">2026-010-7-03:02</span>-css-terminal.md' },
+    { t: 'cmd', text: 'echo $MOOD' },
+    { t: 'out', html: '<span class="mg">专注，且非常困</span>' }
+  ];
+
+  function makeRow(cls) {
+    var row = document.createElement('div');
+    row.className = 'row ' + cls;
+    termBody.appendChild(row);
+    termBody.scrollTop = termBody.scrollHeight;
+    return row;
+  }
+
+  function trim() {
+    while (termBody.childElementCount > 14) {
+      termBody.removeChild(termBody.firstElementChild);
+    }
+  }
+
+  function typeInto(el, text, speed) {
+    return new Promise(function (resolve) {
+      var i = 0;
+      (function tick() {
+        if (i <= text.length) {
+          el.textContent = text.slice(0, i);
+          i++;
+          setTimeout(tick, speed);
+        } else {
+          resolve();
+        }
+      })();
+    });
+  }
+
+  var cursorEl = null;
+
+  function showCursor() {
+    if (cursorEl) return;
+    cursorEl = document.createElement('span');
+    cursorEl.className = 'cursor';
+    termBody.appendChild(cursorEl);
+    termBody.scrollTop = termBody.scrollHeight;
+  }
+
+  function hideCursor() {
+    if (cursorEl && cursorEl.parentNode) {
+      cursorEl.parentNode.removeChild(cursorEl);
+    }
+    cursorEl = null;
+  }
+
+  async function play() {
+    termBody.innerHTML = '';
+
+    for (var i = 0; i < script.length; i++) {
+      var step = script[i];
+
+      if (step.t === 'cmd') {
+        trim();
+        var row = makeRow('cmd-line');
+        row.innerHTML = '<span class="ps1">visitor@blog</span>' +
+                        '<span class="pth">:~</span>' +
+                        '<span class="ps1">$</span> ' +
+                        '<span class="cmd"></span>';
+        var cmdSpan = row.querySelector('.cmd');
+        await typeInto(cmdSpan, step.text, 42);
+        await sleep(340);
+      } else {
+        trim();
+        var outRow = makeRow('out');
+        outRow.innerHTML = step.html || step.text || '';
+        await sleep(300);
+      }
+    }
+
+    await sleep(500);
+    trim();
+    showCursor();
+    await sleep(3400);
+
+    hideCursor();
+    await sleep(400);
+    play();
+  }
+
+  var started = false;
+  function start() {
+    if (started) return;
+    started = true;
+    play();
+  }
+
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) {
+          start();
+          io.disconnect();
+        }
+      });
+    }, { threshold: 0.15 });
+    io.observe(termBody);
+  } else {
+    start();
+  }
+})();
+</script>
+
+</body>
+</html>
