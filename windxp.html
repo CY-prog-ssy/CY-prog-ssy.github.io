@@ -1,0 +1,1181 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>Windows XP 模拟器</title>
+<style>
+/* ================= 基础 ================= */
+:root{
+  --taskbar-h: 30px;
+  --titlebar-h: 28px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}
+html,body{width:100%;height:100%;overflow:hidden;overscroll-behavior:none}
+body{
+  font-family:Tahoma,"宋体",SimSun,sans-serif;font-size:11px;
+  user-select:none;-webkit-user-select:none;cursor:default;
+  background:#000;
+}
+
+/* ================= 桌面 ================= */
+#desktop{position:fixed;inset:0;overflow:hidden;background:#245edb;touch-action:none}
+.wallpaper{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none}
+
+/* ================= 桌面图标 ================= */
+#desk-icons{
+  position:absolute;top:6px;left:6px;z-index:2;
+  display:flex;flex-direction:column;flex-wrap:wrap;gap:2px;
+  max-height:calc(100% - var(--taskbar-h) - 10px);
+}
+.desk-icon{width:78px;padding:5px 2px 3px;text-align:center;color:#fff;border-radius:2px}
+.desk-icon .ico{display:block;font-size:30px;line-height:34px;filter:drop-shadow(1px 2px 2px rgba(0,0,0,.45))}
+.desk-icon .lbl{
+  display:inline-block;font-size:11px;line-height:14px;padding:1px 3px;
+  text-shadow:1px 1px 2px rgba(0,0,0,.85);border:1px dotted transparent;
+}
+.desk-icon.sel{background:rgba(49,106,197,.45)}
+.desk-icon.sel .lbl{background:#316ac5;border-color:#cfdcf5}
+
+/* ================= 窗口层 ================= */
+#window-layer{
+  position:absolute;left:0;right:0;top:0;bottom:var(--taskbar-h);
+  z-index:5;pointer-events:none;
+}
+.window{
+  position:absolute;pointer-events:auto;
+  display:flex;flex-direction:column;background:#0054e3;
+  border-radius:8px 8px 0 0;box-shadow:2px 2px 14px rgba(0,0,0,.55);
+  min-width:200px;min-height:130px;
+}
+.titlebar{
+  flex:0 0 var(--titlebar-h);height:var(--titlebar-h);
+  display:flex;align-items:center;gap:5px;padding:0 3px 0 6px;
+  border-radius:8px 8px 0 0;touch-action:none;
+  background:linear-gradient(to bottom,#0058ee 0%,#3593ff 7%,#0f6fe0 42%,#0a5fd0 86%,#0347a8 100%);
+}
+.window.inactive .titlebar{background:linear-gradient(to bottom,#7ba2e7 0%,#9ec1f5 7%,#7aa1e0 42%,#6b93d6 86%,#5a82c8 100%)}
+.tb-icon{font-size:15px;filter:drop-shadow(1px 1px 0 rgba(0,0,0,.35))}
+.tb-title{
+  flex:1;color:#fff;font-weight:bold;font-size:12px;
+  text-shadow:1px 1px 1px rgba(0,0,0,.55);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.tb-btns{display:flex;gap:2px}
+.tb-btn{
+  width:21px;height:21px;border-radius:3px;padding:0;
+  border:1px solid rgba(255,255,255,.75);
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;font-size:12px;line-height:1;font-family:Tahoma,sans-serif;
+  background:linear-gradient(to bottom,#4a9cff,#0b52c9);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.45);
+}
+.tb-btn:hover{filter:brightness(1.18)}
+.tb-btn:active{filter:brightness(.85)}
+.tb-close{background:linear-gradient(to bottom,#f7a987 0%,#e0552a 45%,#b32d0d 100%)}
+.window-body{
+  flex:1;min-height:0;margin:0 3px 3px 3px;background:#ece9d8;
+  overflow:hidden;position:relative;display:flex;flex-direction:column;
+  border-radius:0 0 3px 3px;
+}
+
+/* ================= 通用 UI ================= */
+.menubar{
+  display:flex;gap:1px;padding:2px 3px;background:#ece9d8;
+  border-bottom:1px solid #d6d2c7;flex:0 0 auto;font-size:11px;
+}
+.menubar span{padding:2px 7px;border-radius:2px}
+.menubar span:hover{background:#316ac5;color:#fff}
+.side-panel{
+  width:170px;flex:0 0 170px;padding:10px 8px;overflow:auto;
+  background:linear-gradient(to right,#7ba0e8,#6d94e0);
+}
+.side-group{background:#fff;border-radius:5px;margin-bottom:10px;overflow:hidden;box-shadow:0 0 0 1px rgba(255,255,255,.6)}
+.side-title{background:linear-gradient(to right,#dbe7fb,#c3d8f7);padding:5px 8px;font-weight:bold;color:#14428c;font-size:11px}
+.side-link{padding:5px 8px 5px 22px;color:#14428c;font-size:11px;position:relative}
+.side-link::before{content:"›";position:absolute;left:9px;color:#3b7c2a;font-weight:bold}
+.side-link:hover{color:#f60;text-decoration:underline}
+
+/* ================= 任务栏 ================= */
+#taskbar{
+  position:absolute;left:0;right:0;bottom:0;height:var(--taskbar-h);z-index:1000;
+  display:flex;align-items:stretch;
+  background:linear-gradient(to bottom,#1f5fdd 0%,#3d8ef7 8%,#2a6fe0 14%,#245edb 46%,#2257c9 88%,#1941a5 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.45);
+}
+#start-btn{
+  height:100%;padding:0 22px 2px 9px;border:none;border-radius:0 9px 9px 0;
+  background:linear-gradient(to bottom,#6ac46a 0%,#3f9a3f 9%,#2f8a2f 45%,#227a22 88%,#175d17 100%);
+  color:#fff;font-weight:bold;font-size:14px;font-style:italic;
+  font-family:"Trebuchet MS",Tahoma,sans-serif;
+  text-shadow:1px 1px 1px rgba(0,0,0,.55);
+  display:flex;align-items:center;gap:6px;flex:0 0 auto;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.45),2px 0 4px rgba(0,0,0,.3);
+}
+#start-btn:hover{filter:brightness(1.13)}
+#start-btn.active{filter:brightness(.85)}
+.start-flag{font-size:16px;filter:drop-shadow(1px 1px 1px rgba(0,0,0,.4))}
+#task-list{flex:1;display:flex;align-items:center;gap:3px;padding:0 5px;overflow:hidden}
+.task-btn{
+  min-width:130px;max-width:162px;height:23px;padding:0 8px;
+  display:flex;align-items:center;gap:5px;border-radius:3px;
+  border:1px solid #1a4bb5;background:linear-gradient(to bottom,#4a97f5,#245edb);
+  color:#fff;font-size:11px;font-family:inherit;overflow:hidden;white-space:nowrap;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.3);
+}
+.task-btn .task-label{overflow:hidden;text-overflow:ellipsis}
+.task-btn.active{background:linear-gradient(to bottom,#1b4bb5,#4a97f5);box-shadow:inset 1px 1px 4px rgba(0,0,0,.55)}
+.task-btn:hover{filter:brightness(1.12)}
+#tray{
+  flex:0 0 auto;display:flex;align-items:center;gap:9px;padding:0 12px 0 10px;
+  color:#fff;font-size:11px;
+  background:linear-gradient(to bottom,#19a5ec 0%,#0f8ad6 45%,#0a6cb8 100%);
+  box-shadow:inset 2px 0 3px rgba(0,0,0,.25);
+}
+#clock{letter-spacing:.3px;white-space:nowrap}
+
+/* ================= 开始菜单 ================= */
+#start-menu{
+  position:absolute;left:0;bottom:var(--taskbar-h);width:392px;z-index:1001;
+  display:none;flex-direction:column;overflow:hidden;
+  border-radius:8px 8px 0 0;box-shadow:3px -2px 16px rgba(0,0,0,.6);
+  font-size:11px;
+}
+#start-menu.show{display:flex}
+.sm-top{
+  height:56px;display:flex;align-items:center;gap:10px;padding:0 12px;
+  background:linear-gradient(to bottom,#1a6fe0 0%,#3d93f5 40%,#1f6fdc 100%);
+  border-bottom:2px solid #e88a2f;color:#fff;font-size:15px;font-weight:bold;
+  font-style:italic;text-shadow:1px 1px 2px rgba(0,0,0,.6);
+}
+.sm-avatar{
+  width:38px;height:38px;border-radius:4px;flex:0 0 auto;
+  background:linear-gradient(135deg,#ffd88a,#e8a33d);
+  border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.5);
+  display:flex;align-items:center;justify-content:center;font-size:22px;
+}
+.sm-main{display:flex;background:#fff}
+.sm-left{flex:1;background:#fff;padding:6px;min-height:230px}
+.sm-right{width:170px;background:#d3e5fa;padding:6px;border-left:1px solid #a8c8ea}
+.sm-item{display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:3px;color:#000;font-size:12px}
+.sm-item:hover{background:#2f71cd;color:#fff}
+.sm-item.sm-small{font-size:11px;padding:5px 7px}
+.sm-ic{font-size:20px;width:24px;text-align:center;line-height:1;flex:0 0 auto}
+.sm-small .sm-ic{font-size:16px;width:20px}
+.sm-sep{height:1px;background:#c8d8ec;margin:5px 8px}
+.sm-arrow{margin-left:auto;font-size:10px}
+.sm-bottom{
+  display:flex;justify-content:flex-end;gap:10px;padding:7px 12px;
+  background:linear-gradient(to bottom,#3d93f5,#1a63d4);border-top:1px solid #4aa0ff;
+}
+.sm-bottom button{
+  border:none;background:transparent;color:#fff;font-family:inherit;font-size:11px;
+  font-weight:bold;padding:3px 6px;border-radius:3px;display:flex;align-items:center;gap:5px;
+  text-shadow:1px 1px 1px rgba(0,0,0,.5);
+}
+.sm-bottom button:hover{background:rgba(255,255,255,.22)}
+
+/* ================= 我的电脑 / 资源管理器 ================= */
+.explorer-bar{display:flex;align-items:center;gap:6px;padding:3px 6px;background:#ece9d8;border-bottom:1px solid #d6d2c7;flex:0 0 auto}
+.explorer-bar span{color:#333}
+.explorer-bar input{flex:1;height:20px;border:1px solid #7f9db9;background:#fff;padding:0 5px;font-family:inherit;font-size:11px;color:#333;min-width:0}
+.explorer-body{flex:1;min-height:0;display:flex;overflow:hidden}
+.explorer-main{flex:1;background:#fff;overflow:auto;padding:12px;touch-action:pan-y}
+.drive-title{font-weight:bold;color:#14428c;border-bottom:1px solid #c3d8f7;padding-bottom:3px;margin-bottom:10px}
+.drive-item{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:3px}
+.drive-item:hover{background:#e8f0fe}
+.drive-item .d-ico{font-size:32px;flex:0 0 auto}
+.drive-item b{font-size:12px;display:block;margin-bottom:2px}
+.drive-item small{color:#666}
+
+/* ================= 记事本 ================= */
+.notepad-area{
+  flex:1;min-height:0;border:none;outline:none;resize:none;padding:5px;
+  font-family:"Lucida Console",Consolas,monospace;font-size:12px;line-height:1.5;
+  background:#fff;color:#000;user-select:text;-webkit-user-select:text;
+  touch-action:pan-y;
+}
+
+/* ================= 计算器 ================= */
+.calc{padding:8px;background:#ece9d8;flex:1;min-height:0;display:flex;flex-direction:column;gap:8px}
+.calc-display{
+  background:#fff;border:2px inset #b5b0a4;text-align:right;
+  font-family:"Lucida Console",Consolas,monospace;font-size:22px;
+  padding:4px 8px;color:#000;height:38px;line-height:26px;overflow:hidden;
+}
+.calc-buttons{flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.calc-buttons button{
+  font-family:inherit;font-size:13px;border:1px solid #8d8a80;border-radius:3px;
+  background:linear-gradient(to bottom,#fdfdfd,#e4e1d8);
+  box-shadow:inset 0 1px 0 #fff;padding:0;
+}
+.calc-buttons button:hover{background:linear-gradient(to bottom,#fff,#d9e8fb)}
+.calc-buttons button:active{background:#c9d8ee;box-shadow:inset 1px 1px 3px rgba(0,0,0,.3)}
+.calc-buttons button.op{background:linear-gradient(to bottom,#e8ecf5,#ccd6e8);color:#0b3d91;font-weight:bold}
+.calc-buttons button.eq{background:linear-gradient(to bottom,#9fd0ff,#4a8fe0);color:#fff;font-weight:bold}
+
+/* ================= IE ================= */
+.ie-toolbar{display:flex;align-items:center;gap:5px;padding:4px 6px;background:#ece9d8;border-bottom:1px solid #d6d2c7;flex:0 0 auto;overflow:hidden}
+.ie-toolbar button{
+  width:26px;height:24px;flex:0 0 auto;border:1px solid #8d8a80;border-radius:3px;
+  background:linear-gradient(to bottom,#fdfdfd,#e4e1d8);font-size:12px;padding:0;
+}
+.ie-toolbar button:hover{background:linear-gradient(to bottom,#fff,#d9e8fb)}
+.ie-addr{flex:1;min-width:0;height:22px;border:1px solid #7f9db9;padding:0 6px;font-family:inherit;font-size:11px}
+.ie-go{width:auto!important;padding:0 10px;font-size:11px!important;height:24px}
+.ie-page{flex:1;min-height:0;background:#fff;overflow:auto;padding:20px 26px;color:#000;font-family:"Times New Roman",serif;user-select:text;touch-action:pan-y}
+.ie-page h1{font-size:26px;color:#1a3e8c;margin-bottom:12px;font-family:Georgia,serif}
+.ie-page p{margin-bottom:10px;font-size:13px;line-height:1.6}
+.ie-page a{color:#0645ad;text-decoration:underline}
+.ie-hero{margin:16px 0;padding:14px 18px;border-radius:6px;background:linear-gradient(135deg,#1a6fe0,#59a6ff);color:#fff;font-family:Tahoma,sans-serif}
+.ie-hero b{font-size:15px;display:block;margin-bottom:5px}
+
+/* ================= 扫雷 ================= */
+.mine-wrap{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#c0c0c0;padding:10px;overflow:auto}
+.mine-panel{background:#c0c0c0;border:3px outset #fff;padding:6px;display:flex;flex-direction:column;gap:6px}
+.mine-header{display:flex;align-items:center;justify-content:space-between;border:2px inset #fff;padding:4px 6px;background:#c0c0c0}
+.mine-counter{font-family:"Lucida Console",monospace;font-size:19px;background:#000;color:#f00;padding:1px 4px;letter-spacing:2px}
+.mine-face{width:30px;height:30px;font-size:17px;line-height:1;border:2px outset #fff;background:#c0c0c0;display:flex;align-items:center;justify-content:center;padding:0}
+.mine-face:active{border-style:inset}
+.mine-board{display:grid;grid-template-columns:repeat(9,22px);grid-template-rows:repeat(9,22px);border:3px inset #fff}
+.mine-cell{
+  width:22px;height:22px;font-size:13px;font-weight:bold;
+  display:flex;align-items:center;justify-content:center;
+  background:#c0c0c0;border:2px outset #fff;
+  font-family:Tahoma,sans-serif;line-height:1;
+}
+.mine-cell.revealed{border:1px solid #9a9a9a;background:#c0c0c0}
+.mine-cell[data-n="1"]{color:#0000ff}
+.mine-cell[data-n="2"]{color:#008000}
+.mine-cell[data-n="3"]{color:#ff0000}
+.mine-cell[data-n="4"]{color:#000080}
+.mine-cell[data-n="5"]{color:#800000}
+.mine-cell[data-n="6"]{color:#008080}
+.mine-cell[data-n="7"]{color:#000000}
+.mine-cell[data-n="8"]{color:#808080}
+
+/* ================= 关机 / 旋转提示 ================= */
+#shutdown{
+  position:fixed;inset:0;z-index:9999;display:none;
+  flex-direction:column;align-items:center;justify-content:center;gap:22px;
+  background:#000;color:#fff;font-family:Tahoma,sans-serif;
+}
+#shutdown.show{display:flex}
+.sd-logo{font-size:40px;font-weight:bold;font-style:italic;letter-spacing:1px}
+.sd-logo span{color:#f5a623;font-size:20px;vertical-align:super;margin-left:3px}
+.sd-text{font-size:16px;color:#c8d8f0;text-align:center;padding:0 20px;line-height:1.6}
+
+#rotate-hint{
+  position:fixed;inset:0;z-index:9998;display:none;
+  flex-direction:column;align-items:center;justify-content:center;gap:18px;
+  background:#0a1a35;color:#fff;font-family:Tahoma,"微软雅黑",sans-serif;
+  text-align:center;padding:20px;
+}
+#rotate-hint .rh-icon{
+  font-size:64px;display:inline-block;
+  animation:rotatePhone 2s ease-in-out infinite;
+}
+@keyframes rotatePhone{
+  0%,35%{transform:rotate(0deg)}
+  55%,100%{transform:rotate(-90deg)}
+}
+#rotate-hint .rh-t1{font-size:20px;font-weight:bold;letter-spacing:1px}
+#rotate-hint .rh-t2{font-size:13px;color:#9fc0ee;margin-top:-8px}
+body.portrait #rotate-hint{display:flex}
+
+/* ================= 滚动条 ================= */
+::-webkit-scrollbar{width:14px;height:14px}
+::-webkit-scrollbar-track{background:#f1f1f1}
+::-webkit-scrollbar-thumb{background:linear-gradient(to right,#d6e5fa,#a8c8ea);border:1px solid #7ba0d8}
+::-webkit-scrollbar-thumb:hover{background:linear-gradient(to right,#bcd6f7,#8ab4e0)}
+
+/* ================= 触屏适配 ================= */
+@media (pointer:coarse){
+  :root{ --taskbar-h:32px; --titlebar-h:30px; }
+
+  .desk-icon{width:64px;padding:4px 1px 2px}
+  .desk-icon .ico{font-size:25px;line-height:29px}
+  .desk-icon .lbl{font-size:10px;line-height:12px}
+
+  #start-btn{padding:0 15px 2px 8px;font-size:13px;gap:4px}
+  .start-flag{font-size:14px}
+  .task-btn{min-width:92px;max-width:118px;height:24px;font-size:10px;padding:0 6px}
+  #tray{gap:6px;padding:0 9px;font-size:10px}
+
+  .tb-btn{width:24px;height:24px;font-size:13px}
+  .tb-title{font-size:12px}
+
+  #start-menu{width:min(392px,94vw)}
+  .sm-top{height:44px;font-size:13px;gap:8px;padding:0 10px}
+  .sm-avatar{width:30px;height:30px;font-size:17px;border-width:1px}
+  .sm-main{min-height:0}
+  .sm-left{min-height:172px;padding:4px}
+  .sm-right{width:146px;padding:4px}
+  .sm-item{padding:5px 7px;font-size:11px;gap:7px}
+  .sm-item.sm-small{padding:4px 6px;font-size:10px}
+  .sm-ic{font-size:17px;width:20px}
+  .sm-small .sm-ic{font-size:14px;width:17px}
+  .sm-sep{margin:4px 6px}
+  .sm-bottom{padding:5px 8px;gap:6px}
+  .sm-bottom button{font-size:10px;padding:3px 5px}
+
+  .menubar span{padding:3px 6px}
+  .side-panel{width:132px;flex:0 0 132px;padding:7px 6px}
+  .side-title{font-size:10px;padding:4px 6px}
+  .side-link{font-size:10px;padding:4px 6px 4px 18px}
+  .explorer-main{padding:8px}
+  .drive-item .d-ico{font-size:26px}
+
+  .calc-buttons button{font-size:15px}
+  .calc-display{font-size:20px;height:36px;line-height:24px}
+
+  .ie-page{padding:14px 16px}
+  .ie-page h1{font-size:20px}
+  .ie-page p{font-size:12px}
+
+  .mine-board{grid-template-columns:repeat(9,26px);grid-template-rows:repeat(9,26px)}
+  .mine-cell{width:26px;height:26px;font-size:15px}
+  .mine-counter{font-size:18px}
+}
+
+/* 手机横屏窄高 */
+@media (pointer:coarse) and (max-height:430px){
+  :root{ --taskbar-h:30px; --titlebar-h:27px; }
+  .desk-icon{width:58px}
+  .desk-icon .ico{font-size:22px;line-height:26px}
+  .sm-left{min-height:150px}
+  .sm-top{height:38px;font-size:12px}
+  .sm-avatar{width:26px;height:26px;font-size:15px}
+}
+</style>
+</head>
+<body>
+
+<div id="desktop">
+  <!-- 壁纸 -->
+  <svg class="wallpaper" viewBox="0 0 1024 768" preserveAspectRatio="xMidYMid slice">
+    <defs>
+      <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#1b5fae"/>
+        <stop offset="42%" stop-color="#5aa3e0"/>
+        <stop offset="100%" stop-color="#c6e3f8"/>
+      </linearGradient>
+      <linearGradient id="grassGrad" x1="0.2" y1="0" x2="0.6" y2="1">
+        <stop offset="0%" stop-color="#a4d458"/>
+        <stop offset="30%" stop-color="#6aa831"/>
+        <stop offset="100%" stop-color="#2c6112"/>
+      </linearGradient>
+      <linearGradient id="hill2" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#7bbb3a"/>
+        <stop offset="100%" stop-color="#3d7a1a"/>
+      </linearGradient>
+      <filter id="soft"><feGaussianBlur stdDeviation="14"/></filter>
+    </defs>
+    <rect width="1024" height="768" fill="url(#skyGrad)"/>
+    <g fill="#ffffff" opacity="0.8" filter="url(#soft)">
+      <ellipse cx="170" cy="150" rx="95" ry="34"/>
+      <ellipse cx="245" cy="126" rx="68" ry="28"/>
+      <ellipse cx="110" cy="128" rx="55" ry="22"/>
+      <ellipse cx="720" cy="205" rx="115" ry="34"/>
+      <ellipse cx="815" cy="182" rx="72" ry="26"/>
+      <ellipse cx="470" cy="95" rx="80" ry="24"/>
+    </g>
+    <path d="M0,768 L0,545 C130,470 250,432 410,458 C590,488 730,472 890,420 C945,402 990,390 1024,382 L1024,768 Z" fill="url(#grassGrad)"/>
+    <path d="M0,768 L0,610 C210,548 390,566 570,606 C770,650 905,624 1024,584 L1024,768 Z" fill="url(#hill2)" opacity="0.75"/>
+  </svg>
+
+  <!-- 桌面图标 -->
+  <div id="desk-icons">
+    <div class="desk-icon" data-app="mycomputer"><span class="ico">🖥️</span><span class="lbl">我的电脑</span></div>
+    <div class="desk-icon" data-app="mydocs"><span class="ico">📁</span><span class="lbl">我的文档</span></div>
+    <div class="desk-icon" data-app="recycle"><span class="ico">🗑️</span><span class="lbl">回收站</span></div>
+    <div class="desk-icon" data-app="ie"><span class="ico">🌐</span><span class="lbl">Internet<br>Explorer</span></div>
+    <div class="desk-icon" data-app="notepad"><span class="ico">📝</span><span class="lbl">记事本</span></div>
+    <div class="desk-icon" data-app="calc"><span class="ico">🧮</span><span class="lbl">计算器</span></div>
+    <div class="desk-icon" data-app="mine"><span class="ico">💣</span><span class="lbl">扫雷</span></div>
+  </div>
+
+  <!-- 窗口层 -->
+  <div id="window-layer"></div>
+
+  <!-- 开始菜单 -->
+  <div id="start-menu">
+    <div class="sm-top">
+      <div class="sm-avatar">👤</div>
+      <div>管理员</div>
+    </div>
+    <div class="sm-main">
+      <div class="sm-left">
+        <div class="sm-item" data-app="ie"><span class="sm-ic">🌐</span>Internet Explorer</div>
+        <div class="sm-item" data-app="notepad"><span class="sm-ic">📝</span>记事本</div>
+        <div class="sm-item" data-app="calc"><span class="sm-ic">🧮</span>计算器</div>
+        <div class="sm-item" data-app="mine"><span class="sm-ic">💣</span>扫雷</div>
+        <div class="sm-sep"></div>
+        <div class="sm-item"><span class="sm-ic">📂</span>所有程序<span class="sm-arrow">▶</span></div>
+      </div>
+      <div class="sm-right">
+        <div class="sm-item sm-small" data-app="mydocs"><span class="sm-ic">📁</span>我的文档</div>
+        <div class="sm-item sm-small" data-app="mycomputer"><span class="sm-ic">🖥️</span>我的电脑</div>
+        <div class="sm-sep"></div>
+        <div class="sm-item sm-small"><span class="sm-ic">⚙️</span>控制面板</div>
+        <div class="sm-item sm-small"><span class="sm-ic">❓</span>帮助和支持</div>
+        <div class="sm-item sm-small"><span class="sm-ic">🔍</span>搜索</div>
+        <div class="sm-item sm-small"><span class="sm-ic">▶️</span>运行...</div>
+      </div>
+    </div>
+    <div class="sm-bottom">
+      <button id="btn-logoff">🔑 注销</button>
+      <button id="btn-shutdown">⏻ 关闭计算机</button>
+    </div>
+  </div>
+
+  <!-- 任务栏 -->
+  <div id="taskbar">
+    <button id="start-btn"><span class="start-flag">🪟</span>开始</button>
+    <div id="task-list"></div>
+    <div id="tray">
+      <span>🔊</span><span>🛡️</span>
+      <span id="clock">上午 12:00</span>
+    </div>
+  </div>
+</div>
+
+<!-- 关机界面 -->
+<div id="shutdown">
+  <div class="sd-logo">Windows<span>xp</span></div>
+  <div class="sd-text">Windows 正在关机...</div>
+</div>
+
+
+<script>
+/* ==========================================================
+   环境判断
+   ========================================================== */
+const TOUCH_MODE = (('ontouchstart' in window) || navigator.maxTouchPoints > 0)
+                   && Math.min(window.innerWidth, window.innerHeight) < 820;
+
+if (TOUCH_MODE) document.body.classList.add('touch');
+
+/* ==========================================================
+   应用定义
+   ========================================================== */
+const APPS = {
+  mycomputer: {
+    title:'我的电脑', icon:'🖥️', width:660, height:450,
+    html:`
+      <div class="menubar"><span>文件</span><span>编辑</span><span>查看</span><span>收藏</span><span>工具</span><span>帮助</span></div>
+      <div class="explorer-bar"><span>地址</span><input value="我的电脑" readonly></div>
+      <div class="explorer-body">
+        <div class="side-panel">
+          <div class="side-group">
+            <div class="side-title">系统任务</div>
+            <div class="side-link">查看系统信息</div>
+            <div class="side-link">添加或删除程序</div>
+            <div class="side-link">更改一个设置</div>
+          </div>
+          <div class="side-group">
+            <div class="side-title">其它位置</div>
+            <div class="side-link">我的文档</div>
+            <div class="side-link">共享文档</div>
+            <div class="side-link">控制面板</div>
+          </div>
+          <div class="side-group">
+            <div class="side-title">详细信息</div>
+            <div style="padding:6px 8px;color:#444;line-height:1.6">Windows XP<br>Professional<br>版本 2002<br>Service Pack 3</div>
+          </div>
+        </div>
+        <div class="explorer-main">
+          <div class="drive-title">硬盘</div>
+          <div class="drive-item"><span class="d-ico">💽</span><div><b>本地磁盘 (C:)</b><small>共 40.0 GB，可用 12.3 GB</small></div></div>
+          <div class="drive-item"><span class="d-ico">💽</span><div><b>本地磁盘 (D:)</b><small>共 80.0 GB，可用 45.7 GB</small></div></div>
+          <div class="drive-title" style="margin-top:16px">有可移动存储的设备</div>
+          <div class="drive-item"><span class="d-ico">💾</span><div><b>3.5 软盘 (A:)</b><small></small></div></div>
+          <div class="drive-item"><span class="d-ico">📀</span><div><b>DVD 驱动器 (E:)</b><small></small></div></div>
+          <div class="drive-title" style="margin-top:16px">其它</div>
+          <div class="drive-item"><span class="d-ico">📁</span><div><b>共享文档</b><small></small></div></div>
+          <div class="drive-item"><span class="d-ico">👤</span><div><b>Administrator 的文档</b><small></small></div></div>
+        </div>
+      </div>`
+  },
+
+  mydocs: {
+    title:'我的文档', icon:'📁', width:600, height:400,
+    html:`
+      <div class="menubar"><span>文件</span><span>编辑</span><span>查看</span><span>收藏</span><span>工具</span><span>帮助</span></div>
+      <div class="explorer-bar"><span>地址</span><input value="C:\\Documents and Settings\\Administrator\\My Documents" readonly></div>
+      <div class="explorer-body">
+        <div class="side-panel">
+          <div class="side-group">
+            <div class="side-title">文件和文件夹任务</div>
+            <div class="side-link">新建文件夹</div>
+            <div class="side-link">发布到 Web</div>
+            <div class="side-link">共享此文件夹</div>
+          </div>
+          <div class="side-group">
+            <div class="side-title">其它位置</div>
+            <div class="side-link">桌面</div>
+            <div class="side-link">共享文档</div>
+            <div class="side-link">我的电脑</div>
+          </div>
+        </div>
+        <div class="explorer-main">
+          <div class="drive-item"><span class="d-ico">📁</span><div><b>图片收藏</b><small>文件夹</small></div></div>
+          <div class="drive-item"><span class="d-ico">🎵</span><div><b>我的音乐</b><small>文件夹</small></div></div>
+          <div class="drive-item"><span class="d-ico">📄</span><div><b>readme.txt</b><small>文本文档 &nbsp; 1 KB</small></div></div>
+          <div class="drive-item"><span class="d-ico">📄</span><div><b>工作计划.doc</b><small>Word 文档 &nbsp; 24 KB</small></div></div>
+        </div>
+      </div>`
+  },
+
+  recycle: {
+    title:'回收站', icon:'🗑️', width:560, height:360,
+    html:`
+      <div class="menubar"><span>文件</span><span>编辑</span><span>查看</span><span>帮助</span></div>
+      <div class="explorer-bar"><span>地址</span><input value="回收站" readonly></div>
+      <div class="explorer-body">
+        <div class="side-panel">
+          <div class="side-group">
+            <div class="side-title">回收站任务</div>
+            <div class="side-link">清空回收站</div>
+            <div class="side-link">还原所有项目</div>
+          </div>
+        </div>
+        <div class="explorer-main" style="display:flex;align-items:center;justify-content:center;color:#888;font-size:12px">
+          回收站是空的
+        </div>
+      </div>`
+  },
+
+  notepad: {
+    title:'未命名 - 记事本', icon:'📝', width:560, height:400,
+    html:`
+      <div class="menubar"><span>文件</span><span>编辑</span><span>格式</span><span>查看</span><span>帮助</span></div>
+      <textarea class="notepad-area" spellcheck="false">欢迎使用 Windows XP 模拟器！
+
+这是一个用纯 HTML + CSS + JavaScript 制作的网页版 Windows XP。
+
+你可以试试：
+  · 拖动窗口标题栏来移动窗口
+  · 双击标题栏最大化窗口
+  · 点击任务栏按钮最小化 / 还原
+  · 打开「扫雷」玩一局
+  · 打开「计算器」算个数
+
+手机用户请横屏使用，双击图标改为单击打开。
+
+祝你玩得开心 :)</textarea>`
+  },
+
+  calc: {
+    title:'计算器', icon:'🧮', width:280, height:340,
+    html:`
+      <div class="menubar"><span>编辑</span><span>查看</span><span>帮助</span></div>
+      <div class="calc">
+        <div class="calc-display">0</div>
+        <div class="calc-buttons">
+          <button data-k="C">C</button>
+          <button data-k="CE">CE</button>
+          <button data-k="back">←</button>
+          <button class="op" data-k="/">/</button>
+          <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
+          <button class="op" data-k="*">*</button>
+          <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
+          <button class="op" data-k="-">-</button>
+          <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
+          <button class="op" data-k="+">+</button>
+          <button data-k="neg">±</button><button data-k="0">0</button><button data-k=".">.</button>
+          <button class="eq" data-k="=">=</button>
+        </div>
+      </div>`,
+    init(root){
+      const disp = root.querySelector('.calc-display');
+      let cur = '0', prev = null, op = null, fresh = true;
+      const show = v => disp.textContent = v;
+
+      function calc(a, b, o) {
+        a = parseFloat(a); b = parseFloat(b);
+        let r;
+        switch (o) {
+          case '+': r = a + b; break;
+          case '-': r = a - b; break;
+          case '*': r = a * b; break;
+          case '/': return b === 0 ? '除数不能为零' : a / b;
+        }
+        return Math.round(r * 1e10) / 1e10;
+      }
+
+      root.querySelector('.calc-buttons').addEventListener('click', e => {
+        const btn = e.target.closest('button');
+        if (!btn) return;
+        const k = btn.dataset.k;
+
+        if (/^[0-9]$/.test(k)) {
+          if (fresh) { cur = k; fresh = false; }
+          else cur = cur === '0' ? k : cur + k;
+          show(cur);
+        } else if (k === '.') {
+          if (fresh) { cur = '0.'; fresh = false; }
+          else if (!cur.includes('.')) cur += '.';
+          show(cur);
+        } else if (k === 'C') {
+          cur = '0'; prev = null; op = null; fresh = true; show(cur);
+        } else if (k === 'CE') {
+          cur = '0'; fresh = true; show(cur);
+        } else if (k === 'back') {
+          cur = cur.length > 1 ? cur.slice(0, -1) : '0';
+          if (cur === '-') cur = '0';
+          show(cur);
+        } else if (k === 'neg') {
+          cur = cur.startsWith('-') ? cur.slice(1) : '-' + cur;
+          show(cur);
+        } else if ('+-*/'.includes(k)) {
+          if (op !== null && !fresh) {
+            const r = calc(prev, cur, op);
+            if (r === '除数不能为零') { cur = r; prev = null; op = null; fresh = true; show(cur); return; }
+            prev = String(r); cur = String(r); show(cur);
+          } else {
+            prev = cur;
+          }
+          op = k; fresh = true;
+        } else if (k === '=') {
+          if (op !== null) {
+            const r = calc(prev, cur, op);
+            cur = String(r); prev = null; op = null; fresh = true; show(cur);
+          }
+        }
+      });
+    }
+  },
+
+  ie: {
+    title:'Microsoft Internet Explorer', icon:'🌐', width:760, height:520,
+    html:`
+      <div class="menubar"><span>文件</span><span>编辑</span><span>查看</span><span>收藏</span><span>工具</span><span>帮助</span></div>
+      <div class="ie-toolbar">
+        <button title="后退">◀</button>
+        <button title="前进">▶</button>
+        <button title="停止">✕</button>
+        <button title="刷新">⟳</button>
+        <button title="主页">🏠</button>
+        <span style="margin-left:4px">地址</span>
+        <input class="ie-addr" value="http://www.microsoft.com/">
+        <button class="ie-go">转到</button>
+      </div>
+      <div class="ie-page">
+        <h1>Microsoft Internet Explorer</h1>
+        <div class="ie-hero">
+          <b>欢迎来到 Web 世界！</b>
+          你现在使用的是 Internet Explorer 6.0 —— 专为 Windows XP 设计的浏览器。
+        </div>
+        <p>本页面是一个演示用的本地页面，你无法真正访问外部网站。</p>
+        <p>可以试试这些「链接」：</p>
+        <p>
+          · <a href="#">MSN 主页</a><br>
+          · <a href="#">Windows Update</a><br>
+          · <a href="#">Hotmail 免费邮箱</a><br>
+          · <a href="#">MSN Messenger</a>
+        </p>
+        <p style="margin-top:24px;color:#888;font-size:12px;font-family:Tahoma,sans-serif">
+          © 2001 Microsoft Corporation. 保留所有权利。
+        </p>
+      </div>`,
+    init(root){
+      const addr = root.querySelector('.ie-addr');
+      const page = root.querySelector('.ie-page');
+      const go = () => {
+        const url = addr.value.trim().replace(/[<>&"]/g, '');
+        page.innerHTML = `
+          <h1 style="font-family:Tahoma;font-size:22px">无法显示网页</h1>
+          <p style="font-family:Tahoma">您正在查找的网页可能已被删除、名称已被更改，或者暂时不可用。</p>
+          <hr style="margin:14px 0;border:none;border-top:1px solid #ccc">
+          <p style="font-family:Tahoma;font-size:12px;color:#555">
+            请尝试以下操作：<br><br>
+            · 确认该网址 <b>${url}</b> 拼写正确<br>
+            · 返回<a href="#">主页</a><br>
+            · 检查您的网络连接（本模拟器没有网络 😢）
+          </p>`;
+      };
+      root.querySelector('.ie-go').addEventListener('click', go);
+      addr.addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
+    }
+  },
+
+  mine: {
+    title:'扫雷', icon:'💣', width:290, height:370,
+    html:`
+      <div class="menubar"><span>游戏</span><span>帮助</span></div>
+      <div class="mine-wrap">
+        <div class="mine-panel">
+          <div class="mine-header">
+            <div class="mine-counter mine-count">010</div>
+            <button class="mine-face">🙂</button>
+            <div class="mine-counter mine-timer">000</div>
+          </div>
+          <div class="mine-board"></div>
+        </div>
+      </div>`,
+    init(root){
+      const N = 9, M = 10;
+      const board = root.querySelector('.mine-board');
+      const face = root.querySelector('.mine-face');
+      const timerEl = root.querySelector('.mine-timer');
+      const countEl = root.querySelector('.mine-count');
+      let cells = [], over = false, flags = 0, timerId = null, seconds = 0;
+
+      const neighbors = i => {
+        const r = Math.floor(i / N), c = i % N, out = [];
+        for (let dr = -1; dr <= 1; dr++)
+          for (let dc = -1; dc <= 1; dc++) {
+            if (!dr && !dc) continue;
+            const nr = r + dr, nc = c + dc;
+            if (nr >= 0 && nr < N && nc >= 0 && nc < N) out.push(nr * N + nc);
+          }
+        return out;
+      };
+
+      function reset() {
+        clearInterval(timerId); timerId = null; seconds = 0;
+        over = false; flags = 0; cells = [];
+        face.textContent = '🙂';
+        timerEl.textContent = '000';
+        countEl.textContent = String(M).padStart(3, '0');
+        board.innerHTML = '';
+
+        const mineIdx = new Set();
+        while (mineIdx.size < M) mineIdx.add(Math.floor(Math.random() * N * N));
+
+        for (let i = 0; i < N * N; i++) {
+          const el = document.createElement('div');
+          el.className = 'mine-cell';
+          el.dataset.i = i;
+          board.appendChild(el);
+          cells.push({ mine: mineIdx.has(i), el, revealed: false, flagged: false, n: 0 });
+        }
+        cells.forEach((c, i) => {
+          if (c.mine) return;
+          c.n = neighbors(i).filter(j => cells[j].mine).length;
+        });
+      }
+
+      function startTimer() {
+        if (timerId) return;
+        timerId = setInterval(() => {
+          seconds = Math.min(999, seconds + 1);
+          timerEl.textContent = String(seconds).padStart(3, '0');
+        }, 1000);
+      }
+
+      function checkWin() {
+        if (cells.filter(c => c.revealed).length === N * N - M) {
+          over = true;
+          clearInterval(timerId); timerId = null;
+          face.textContent = '😎';
+        }
+      }
+
+      function reveal(i) {
+        const c = cells[i];
+        if (c.revealed || c.flagged || over) return;
+        if (c.mine) {
+          over = true;
+          clearInterval(timerId); timerId = null;
+          cells.forEach(x => {
+            if (x.mine) { x.el.classList.add('revealed'); x.el.textContent = '💣'; }
+          });
+          c.el.style.background = '#ff0000';
+          face.textContent = '😵';
+          return;
+        }
+        c.revealed = true;
+        c.el.classList.add('revealed');
+        if (c.n > 0) {
+          c.el.textContent = c.n;
+          c.el.dataset.n = c.n;
+        } else {
+          neighbors(i).forEach(reveal);
+        }
+        checkWin();
+      }
+
+      function toggleFlag(i) {
+        const c = cells[i];
+        if (!c || c.revealed || over) return;
+        c.flagged = !c.flagged;
+        flags += c.flagged ? 1 : -1;
+        c.el.textContent = c.flagged ? '🚩' : '';
+        countEl.textContent = String(Math.max(0, M - flags)).padStart(3, '0');
+      }
+
+      board.addEventListener('click', e => {
+        const cell = e.target.closest('.mine-cell');
+        if (!cell || over) return;
+        startTimer();
+        reveal(+cell.dataset.i);
+      });
+
+      board.addEventListener('contextmenu', e => {
+        e.preventDefault();
+        const cell = e.target.closest('.mine-cell');
+        if (!cell) return;
+        toggleFlag(+cell.dataset.i);
+      });
+
+      /* 触屏：长按插旗 */
+      let pressTimer = null, longPressed = false;
+      board.addEventListener('pointerdown', e => {
+        if (e.pointerType === 'mouse') return;
+        const cell = e.target.closest('.mine-cell');
+        if (!cell) return;
+        longPressed = false;
+        pressTimer = setTimeout(() => {
+          longPressed = true;
+          toggleFlag(+cell.dataset.i);
+        }, 450);
+      });
+      board.addEventListener('pointerup', () => { clearTimeout(pressTimer); });
+      board.addEventListener('pointercancel', () => { clearTimeout(pressTimer); });
+      board.addEventListener('pointermove', () => { clearTimeout(pressTimer); });
+
+      face.addEventListener('click', reset);
+      reset();
+    }
+  }
+};
+
+/* ==========================================================
+   窗口管理
+   ========================================================== */
+const layer = document.getElementById('window-layer');
+const taskList = document.getElementById('task-list');
+const openWindows = {};
+let zTop = 10;
+
+function openApp(id) {
+  const app = APPS[id];
+  if (!app) return;
+
+  if (openWindows[id]) {
+    restoreWindow(id);
+    focusWindow(id);
+    return;
+  }
+
+  const el = document.createElement('div');
+  el.className = 'window active';
+  el.innerHTML = `
+    <div class="titlebar">
+      <span class="tb-icon">${app.icon}</span>
+      <span class="tb-title">${app.title}</span>
+      <div class="tb-btns">
+        <button class="tb-btn tb-min" title="最小化">–</button>
+        <button class="tb-btn tb-max" title="最大化">□</button>
+        <button class="tb-btn tb-close" title="关闭">✕</button>
+      </div>
+    </div>
+    <div class="window-body"></div>`;
+  layer.appendChild(el);
+
+  const body = el.querySelector('.window-body');
+  body.innerHTML = app.html;
+  if (app.init) app.init(body);
+
+  // 任务栏按钮
+  const task = document.createElement('button');
+  task.className = 'task-btn active';
+  task.innerHTML = `<span>${app.icon}</span><span class="task-label">${app.title}</span>`;
+  task.addEventListener('click', () => {
+    const w = openWindows[id];
+    if (!w) return;
+    const isActive = w.el.classList.contains('active') && !w.minimized;
+    if (isActive) minimizeWindow(id);
+    else { restoreWindow(id); focusWindow(id); }
+  });
+  taskList.appendChild(task);
+
+  openWindows[id] = {
+    el, task, app, minimized: false, maximized: false, prev: null, id
+  };
+
+  /* 初始尺寸与位置 */
+  const LW = layer.clientWidth, LH = layer.clientHeight;
+  if (TOUCH_MODE) {
+    // 手机：直接最大化
+    el.style.left = '0px';
+    el.style.top = '0px';
+    el.style.width = LW + 'px';
+    el.style.height = LH + 'px';
+    openWindows[id].maximized = true;
+    el.querySelector('.tb-max').textContent = '❐';
+  } else {
+    const width = Math.min(app.width, LW - 20);
+    const height = Math.min(app.height, LH - 20);
+    const count = Object.keys(openWindows).length - 1;
+    const offset = (count % 7) * 24;
+    el.style.width = width + 'px';
+    el.style.height = height + 'px';
+    el.style.left = Math.max(8, Math.round((LW - width) / 2) - 70 + offset) + 'px';
+    el.style.top = Math.max(8, Math.round((LH - height) / 2) - 50 + offset) + 'px';
+  }
+
+  /* 标题栏按钮 */
+  el.querySelector('.tb-min').addEventListener('click', e => { e.stopPropagation(); minimizeWindow(id); });
+  el.querySelector('.tb-max').addEventListener('click', e => { e.stopPropagation(); toggleMax(id); });
+  el.querySelector('.tb-close').addEventListener('click', e => { e.stopPropagation(); closeWindow(id); });
+
+  /* 拖动（pointer 事件，鼠标 + 触屏统一） */
+  const titlebar = el.querySelector('.titlebar');
+  titlebar.addEventListener('pointerdown', e => {
+    if (e.target.closest('.tb-btn')) return;
+    focusWindow(id);
+    const w = openWindows[id];
+    if (w.maximized) return;
+
+    const sx = e.clientX, sy = e.clientY;
+    const sl = el.offsetLeft, st = el.offsetTop;
+    const maxL = layer.clientWidth - 60;
+    const maxT = layer.clientHeight - 34;
+
+    function mv(ev) {
+      let nl = sl + ev.clientX - sx;
+      let nt = st + ev.clientY - sy;
+      nl = Math.max(-(el.offsetWidth - 90), Math.min(maxL, nl));
+      nt = Math.max(0, Math.min(maxT, nt));
+      el.style.left = nl + 'px';
+      el.style.top = nt + 'px';
+    }
+    function up() {
+      document.removeEventListener('pointermove', mv);
+      document.removeEventListener('pointerup', up);
+      document.removeEventListener('pointercancel', up);
+    }
+    document.addEventListener('pointermove', mv);
+    document.addEventListener('pointerup', up);
+    document.addEventListener('pointercancel', up);
+  });
+
+  /* 双击标题栏最大化（仅桌面端） */
+  if (!TOUCH_MODE) {
+    titlebar.addEventListener('dblclick', e => {
+      if (e.target.closest('.tb-btn')) return;
+      toggleMax(id);
+    });
+  }
+
+  el.addEventListener('pointerdown', () => focusWindow(id), true);
+
+  focusWindow(id);
+}
+
+function focusWindow(id) {
+  Object.keys(openWindows).forEach(k => {
+    const w = openWindows[k];
+    const active = k === id;
+    w.el.classList.toggle('active', active);
+    w.el.classList.toggle('inactive', !active);
+    w.task.classList.toggle('active', active);
+  });
+  const w = openWindows[id];
+  if (w) w.el.style.zIndex = ++zTop;
+}
+
+function minimizeWindow(id) {
+  const w = openWindows[id];
+  if (!w) return;
+  w.minimized = true;
+  w.el.style.display = 'none';
+  w.task.classList.remove('active');
+  w.el.classList.remove('active');
+  w.el.classList.add('inactive');
+}
+
+function restoreWindow(id) {
+  const w = openWindows[id];
+  if (!w) return;
+  w.minimized = false;
+  w.el.style.display = 'flex';
+}
+
+function toggleMax(id) {
+  const w = openWindows[id];
+  if (!w) return;
+  const el = w.el;
+  if (w.maximized) {
+    el.style.left = w.prev.left;
+    el.style.top = w.prev.top;
+    el.style.width = w.prev.width;
+    el.style.height = w.prev.height;
+    w.maximized = false;
+    el.querySelector('.tb-max').textContent = '□';
+  } else {
+    w.prev = { left: el.style.left, top: el.style.top, width: el.style.width, height: el.style.height };
+    el.style.left = '0px';
+    el.style.top = '0px';
+    el.style.width = layer.clientWidth + 'px';
+    el.style.height = layer.clientHeight + 'px';
+    w.maximized = true;
+    el.querySelector('.tb-max').textContent = '❐';
+  }
+  focusWindow(id);
+}
+
+function closeWindow(id) {
+  const w = openWindows[id];
+  if (!w) return;
+  w.el.remove();
+  w.task.remove();
+  delete openWindows[id];
+  const ids = Object.keys(openWindows);
+  if (ids.length) {
+    ids.sort((a, b) => (+openWindows[a].el.style.zIndex || 0) - (+openWindows[b].el.style.zIndex || 0));
+    focusWindow(ids[ids.length - 1]);
+  }
+}
+
+/* ==========================================================
+   桌面图标
+   ========================================================== */
+document.querySelectorAll('.desk-icon').forEach(el => {
+  el.addEventListener('click', e => {
+    e.stopPropagation();
+    document.querySelectorAll('.desk-icon').forEach(x => x.classList.remove('sel'));
+    el.classList.add('sel');
+    if (TOUCH_MODE) openApp(el.dataset.app);   // 触屏：单击打开
+  });
+  if (!TOUCH_MODE) {
+    el.addEventListener('dblclick', () => openApp(el.dataset.app));  // 桌面：双击
+  }
+});
+
+document.getElementById('desktop').addEventListener('pointerdown', e => {
+  if (!e.target.closest('.desk-icon')) {
+    document.querySelectorAll('.desk-icon').forEach(x => x.classList.remove('sel'));
+  }
+});
+
+/* ==========================================================
+   开始菜单
+   ========================================================== */
+const startBtn = document.getElementById('start-btn');
+const startMenu = document.getElementById('start-menu');
+
+startBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  const open = startMenu.classList.toggle('show');
+  startBtn.classList.toggle('active', open);
+});
+
+startMenu.addEventListener('click', e => {
+  const item = e.target.closest('.sm-item');
+  if (item && item.dataset.app) {
+    openApp(item.dataset.app);
+    closeStart();
+  }
+});
+
+document.addEventListener('pointerdown', e => {
+  if (!e.target.closest('#start-menu') && !e.target.closest('#start-btn')) closeStart();
+});
+
+function closeStart() {
+  startMenu.classList.remove('show');
+  startBtn.classList.remove('active');
+}
+
+/* ==========================================================
+   时钟
+   ========================================================== */
+function updateClock() {
+  const d = new Date();
+  let h = d.getHours();
+  const ampm = h < 12 ? '上午' : '下午';
+  h = h % 12 || 12;
+  const m = String(d.getMinutes()).padStart(2, '0');
+  const text = `${ampm} ${h}:${m}`;
+  document.getElementById('clock').textContent = TOUCH_MODE ? `${h}:${m}` : text;
+}
+updateClock();
+setInterval(updateClock, 1000);
+
+/* ==========================================================
+   关机
+   ========================================================== */
+const shutdownEl = document.getElementById('shutdown');
+let sdTimer = null;
+
+document.getElementById('btn-shutdown').addEventListener('click', () => {
+  closeStart();
+  shutdownEl.querySelector('.sd-text').textContent = 'Windows 正在关机...';
+  shutdownEl.classList.add('show');
+  clearTimeout(sdTimer);
+  sdTimer = setTimeout(() => {
+    shutdownEl.querySelector('.sd-text').textContent = '现在可以安全地关闭计算机了。\n（点击屏幕重新启动）';
+  }, 2000);
+});
+
+shutdownEl.addEventListener('click', () => {
+  clearTimeout(sdTimer);
+  shutdownEl.classList.remove('show');
+  shutdownEl.querySelector('.sd-text').textContent = 'Windows 正在关机...';
+});
+
+document.getElementById('btn-logoff').addEventListener('click', closeStart);
+
+/* ==========================================================
+   屏幕方向 & 尺寸自适应
+   ========================================================== */
+function checkOrientation() {
+  const portrait = window.innerHeight > window.innerWidth;
+  document.body.classList.toggle('portrait', TOUCH_MODE && portrait);
+}
+
+function handleResize() {
+  checkOrientation();
+  const LW = layer.clientWidth, LH = layer.clientHeight;
+  Object.keys(openWindows).forEach(k => {
+    const w = openWindows[k];
+    if (w.maximized) {
+      w.el.style.left = '0px';
+      w.el.style.top = '0px';
+      w.el.style.width = LW + 'px';
+      w.el.style.height = LH + 'px';
+    } else {
+      // 保证窗口不出界
+      const maxL = Math.max(0, LW - 90);
+      const maxT = Math.max(0, LH - 34);
+      const l = Math.min(parseInt(w.el.style.left) || 0, maxL);
+      const t = Math.min(parseInt(w.el.style.top) || 0, maxT);
+      w.el.style.left = l + 'px';
+      w.el.style.top = t + 'px';
+      w.el.style.width = Math.min(parseInt(w.el.style.width) || 300, LW) + 'px';
+      w.el.style.height = Math.min(parseInt(w.el.style.height) || 200, LH) + 'px';
+    }
+  });
+}
+
+window.addEventListener('resize', handleResize);
+window.addEventListener('orientationchange', () => {
+  setTimeout(handleResize, 260);
+  setTimeout(handleResize, 600);
+});
+checkOrientation();
+
+/* 阻止手机双指缩放 / 双击缩放 */
+document.addEventListener('gesturestart', e => e.preventDefault());
+document.addEventListener('dblclick', e => {
+  if (TOUCH_MODE) e.preventDefault();
+}, { passive: false });
+
+/* ==========================================================
+   初始化
+   ========================================================== */
+window.addEventListener('load', () => {
+  checkOrientation();
+  if (!TOUCH_MODE) {
+    setTimeout(() => openApp('mycomputer'), 300);
+  }
+});
+</script>
+</body>
+</html>
