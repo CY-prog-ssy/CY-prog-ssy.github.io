@@ -1,0 +1,280 @@
+/* ============================================================
+   1v1 DUEL — 独立样式
+   ============================================================ */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: #0a0c0e;
+  font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color: #eee;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: none;
+  overscroll-behavior: none;
+}
+canvas { display: block; position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; }
+
+#hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+
+/* ---------- 顶部计分板 ---------- */
+#scoreboard {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding: 8px 24px;
+  background: rgba(10, 12, 16, 0.88);
+  border: 1px solid rgba(255, 200, 100, 0.35);
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6);
+}
+#scoreboard .side { text-align: center; min-width: 60px; }
+#scoreboard .label {
+  font-size: 10px; letter-spacing: 0.24em;
+  color: rgba(255, 255, 255, 0.55);
+  margin-bottom: 2px; font-weight: 700;
+}
+#scoreboard .score {
+  font-size: 30px; font-weight: 800;
+  font-family: ui-monospace, Consolas, monospace;
+  line-height: 1;
+}
+#scoreboard .side.enemy  .score { color: #ff5a5a; }
+#scoreboard .side.player .score { color: #5fd0ff; }
+#scoreboard .vs {
+  font-size: 13px; letter-spacing: 0.2em;
+  color: rgba(255, 200, 100, 0.7);
+  font-weight: 700;
+}
+
+/* ---------- 血条 ---------- */
+#hpWrap {
+  position: absolute; left: 20px; bottom: 20px; width: 220px;
+}
+#hpLabel {
+  font-size: 10px; letter-spacing: 0.22em;
+  color: rgba(255, 255, 255, 0.55);
+  margin-bottom: 4px; font-weight: 700;
+}
+#hpBar {
+  height: 12px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  overflow: hidden;
+}
+#hpFill {
+  display: block; height: 100%; width: 100%;
+  background: linear-gradient(180deg, #8ef29a, #39b556);
+  transform-origin: left center;
+  transition: transform 0.15s ease-out;
+}
+
+/* ---------- 弹药 ---------- */
+#ammo {
+  position: absolute; right: 20px; bottom: 20px;
+  text-align: right; min-width: 180px;
+}
+#wname {
+  font-size: 12px; letter-spacing: 0.3em;
+  color: #ffb340; margin-bottom: 4px; font-weight: 700;
+}
+#ammoRow {
+  display: flex; align-items: flex-end; justify-content: flex-end;
+  gap: 8px; font-family: ui-monospace, Consolas, monospace;
+}
+#magNum { font-size: 40px; font-weight: 800; line-height: 0.85; }
+#resNum { font-size: 16px; color: rgba(255, 255, 255, 0.5); padding-bottom: 5px; }
+#reloadHint {
+  height: 14px; font-size: 10px; letter-spacing: 0.25em;
+  color: #ff5a5a; font-weight: 700; margin-top: 4px;
+}
+
+/* ---------- 底部提示 ---------- */
+#hint {
+  position: absolute; left: 50%; bottom: 10px;
+  transform: translateX(-50%);
+  font-size: 10px; letter-spacing: 0.2em;
+  color: rgba(255, 255, 255, 0.35);
+  font-family: ui-monospace, Consolas, monospace;
+  pointer-events: none; white-space: nowrap;
+}
+
+/* ---------- 全屏界面 ---------- */
+.screen {
+  position: fixed; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  z-index: 50;
+  background: radial-gradient(ellipse at 50% 40%, rgba(20,24,30,0.95), rgba(3,5,7,0.99));
+  gap: 18px; cursor: pointer;
+  pointer-events: auto;
+}
+.screen.hide { display: none; }
+
+#startScreen .title {
+  font-size: clamp(40px, 9vw, 86px); font-weight: 800;
+  letter-spacing: 0.05em;
+  background: linear-gradient(180deg, #fff, #8892a0);
+  -webkit-background-clip: text; background-clip: text;
+  color: transparent;
+}
+#startScreen .sub {
+  font-size: 13px; letter-spacing: 0.35em;
+  color: #ffb340; font-weight: 700;
+}
+#startScreen .hint {
+  margin-top: 30px; font-size: 14px; letter-spacing: 0.25em;
+  color: rgba(255, 255, 255, 0.75);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+#startScreen .tips {
+  font-size: 10px; letter-spacing: 0.18em;
+  color: rgba(255, 255, 255, 0.35);
+  font-family: ui-monospace, Consolas, monospace;
+  margin-top: 10px;
+}
+@keyframes pulse { 50% { opacity: 0.3; } }
+
+#endScreen .title {
+  font-size: clamp(44px, 10vw, 96px); font-weight: 800; letter-spacing: 0.06em;
+}
+#endScreen.win  .title { color: #ffb340; text-shadow: 0 0 50px rgba(255, 179, 64, 0.6); }
+#endScreen.lose .title { color: #ff3b30; text-shadow: 0 0 50px rgba(255, 59, 48, 0.6); }
+#endScreen .sub {
+  font-size: 16px; letter-spacing: 0.3em;
+  color: rgba(255, 255, 255, 0.75);
+  font-family: ui-monospace, Consolas, monospace;
+  font-weight: 700;
+}
+#endScreen .btn {
+  pointer-events: auto; cursor: pointer;
+  margin-top: 30px; padding: 14px 40px;
+  background: rgba(255, 179, 64, 0.14);
+  border: 1px solid rgba(255, 179, 64, 0.6);
+  color: #fff; font-family: inherit;
+  font-size: 13px; letter-spacing: 0.3em; font-weight: 700;
+}
+#endScreen .btn:active { transform: translateY(1px); }
+
+/* ============================================================
+   ★ 移动端虚拟按钮（关键修复：pointer-events: none 让触摸穿透到 canvas）
+   ============================================================ */
+#touchUI {
+  display: none;
+  position: fixed;
+  inset: 0;
+  pointer-events: none;   /* ★ 整层透明，触摸穿透 */
+  z-index: 12;
+}
+body.touch #touchUI { display: block; }
+
+#stickBase {
+  position: absolute;
+  width: 130px; height: 130px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 200, 100, 0.3);
+  background: radial-gradient(circle, rgba(20,26,32,0.35), rgba(10,13,17,0.15));
+  display: none;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 13;
+}
+#stickKnob {
+  position: absolute;
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  display: none;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle at 40% 35%, rgba(255,200,100,0.4), rgba(140,90,30,0.3));
+  border: 1px solid rgba(255, 200, 100, 0.6);
+  pointer-events: none;
+  z-index: 14;
+}
+
+.tbtn {
+  position: absolute;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  font-family: ui-monospace, Consolas, monospace;
+  font-weight: 700; letter-spacing: 0.08em;
+  color: #eee;
+  background: rgba(14, 18, 23, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  pointer-events: auto;      /* ★ 按钮本身可点 */
+  touch-action: none;
+  z-index: 15;
+}
+.tbtn span { font-size: 11px; }
+
+#btnFire {
+  right: 16px; bottom: 22px;
+  width: 92px; height: 92px;
+  border-color: rgba(255, 59, 48, 0.65);
+  color: #ff9d96;
+  background: rgba(120, 20, 16, 0.34);
+}
+#btnFire span { font-size: 13px; }
+
+#btnReload {
+  right: 120px; bottom: 30px;
+  width: 60px; height: 60px;
+}
+#btnCrouch {
+  right: 122px; bottom: 108px;
+  width: 60px; height: 60px;
+}
+
+/* ============================================================
+   ★ 竖屏提示
+   ============================================================ */
+#rotateHint {
+  display: none;
+  position: fixed; inset: 0;
+  z-index: 99999;
+  align-items: center; justify-content: center; flex-direction: column;
+  background: #05070a; color: #dfe6ec;
+  text-align: center; padding: 40px; gap: 24px;
+}
+#rotateHint .ph {
+  width: 60px; height: 100px;
+  border: 2px solid #ffb340; border-radius: 10px;
+  position: relative;
+  animation: rot 0.9s ease-in-out infinite alternate;
+}
+#rotateHint .ph::after {
+  content: "";
+  position: absolute; left: 50%; top: 6px;
+  width: 16px; height: 2px; background: #ffb340;
+  transform: translateX(-50%);
+}
+@keyframes rot { 0% { transform: rotate(0deg); } 100% { transform: rotate(-90deg); } }
+#rotateHint b {
+  display: block; color: #ffb340; font-size: 16px;
+  letter-spacing: 0.3em; margin-bottom: 8px;
+}
+#rotateHint span { color: rgba(223,230,236,0.5); font-size: 11px; letter-spacing: 0.18em; }
+#rotateHint .rotateBtn {
+  margin-top: 20px; padding: 12px 32px;
+  font-family: inherit; font-size: 12px; font-weight: 700;
+  letter-spacing: 0.28em;
+  color: #fff;
+  background: rgba(255, 179, 64, 0.14);
+  border: 1px solid rgba(255, 179, 64, 0.6);
+  border-radius: 4px; cursor: pointer;
+}
+#rotateHint .hintText {
+  margin-top: 14px; font-size: 11px; letter-spacing: 0.18em;
+  color: rgba(223, 230, 236, 0.5);
+  text-align: center; max-width: 320px; line-height: 1.7;
+}
+#rotateHint .hintText.ok  { color: #7ee081; }
+#rotateHint .hintText.err { color: #ff8a80; }
+
+@media (orientation: portrait) and (hover: none) and (pointer: coarse) {
+  #rotateHint { display: flex; }
+}

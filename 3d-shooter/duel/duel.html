@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="screen-orientation" content="landscape">
+<meta name="x5-orientation" content="landscape">
+<meta name="full-screen" content="yes">
+<meta name="x5-fullscreen" content="true">
+<meta name="browsermode" content="application">
+<meta name="theme-color" content="#0a0c0e">
+<title>1v1 单挑 — M4 对掏</title>
+<link rel="stylesheet" href="duel.css">
+</head>
+<body>
+
+<canvas id="c"></canvas>
+
+<div id="hud">
+  <div id="scoreboard">
+    <div class="side enemy">
+      <div class="label">AI</div>
+      <div class="score" id="enemyScore">0</div>
+    </div>
+    <div class="vs">VS</div>
+    <div class="side player">
+      <div class="label">YOU</div>
+      <div class="score" id="playerScore">0</div>
+    </div>
+  </div>
+
+  <div id="hpWrap">
+    <div id="hpLabel">VITALS</div>
+    <div id="hpBar"><span id="hpFill"></span></div>
+  </div>
+
+  <div id="ammo">
+    <div id="wname">M4 CARBINE</div>
+    <div id="ammoRow">
+      <span id="magNum">30</span>
+      <span id="resNum">/ ∞</span>
+    </div>
+    <div id="reloadHint"></div>
+  </div>
+
+  <div id="hint">WASD 移动 · 鼠标转视角 · 左键开火 · R 换弹 · C 蹲下</div>
+</div>
+
+<div id="touchUI">
+  <div id="stickBase"></div>
+  <div id="stickKnob"></div>
+  <div class="tbtn" id="btnFire"><span>开火</span></div>
+  <div class="tbtn" id="btnReload"><span>换弹</span></div>
+  <div class="tbtn" id="btnCrouch"><span>蹲</span></div>
+</div>
+
+<div class="screen" id="startScreen">
+  <div class="title">1v1 DUEL</div>
+  <div class="sub">M4 · 对掏 · 40 分</div>
+  <div class="hint">点击屏幕开始</div>
+  <div class="tips">WASD 移动 · 鼠标转视角 · 左键开火 · R 换弹 · C 蹲下</div>
+</div>
+
+<div class="screen hide" id="endScreen">
+  <div class="title" id="endTitle">YOU WIN</div>
+  <div class="sub" id="endSub"></div>
+  <button class="btn" id="btnRestart">再次挑战</button>
+</div>
+
+<div id="rotateHint">
+  <div class="ph"></div>
+  <div>
+    <b>请将手机旋转为横屏</b>
+    <span>ROTATE YOUR DEVICE TO LANDSCAPE</span>
+  </div>
+  <button class="rotateBtn" id="forceLandscape" type="button">强制横屏 · FORCE</button>
+  <div class="hintText" id="rotateHintMsg">若自动旋转无效，请点击上方按钮</div>
+</div>
+
+<!-- ============================================================
+     ★★★ 独立脚本层（最优先执行，与后续共享 js 完全隔离）★★★
+     1. 强制横屏按钮（永不失效，不依赖任何共享 js）
+     2. 全局错误捕获（调试用）
+     ============================================================ -->
+<script>
+(function(){
+  'use strict';
+
+  /* ---------- 强制横屏 ---------- */
+  function getMsgEl(){ return document.getElementById('rotateHintMsg'); }
+
+  function setMsg(text, isOk){
+    var m = getMsgEl();
+    if (!m) return;
+    m.textContent = text;
+    m.classList.remove('ok', 'err');
+    if (isOk === true)  m.classList.add('ok');
+    if (isOk === false) m.classList.add('err');
+  }
+
+  function tryForceLandscape(){
+    setMsg('正在请求全屏...', null);
+    var el = document.documentElement;
+
+    /* 全屏必须在用户手势的同步代码里 */
+    try {
+      if (el.requestFullscreen){
+        var p = el.requestFullscreen({ navigationUI: 'hide' });
+        if (p && p.catch) p.catch(function(err){ console.warn('全屏被拒：', err); });
+      } else if (el.webkitRequestFullscreen){
+        el.webkitRequestFullscreen();
+      } else if (el.mozRequestFullScreen){
+        el.mozRequestFullScreen();
+      } else if (el.msRequestFullscreen){
+        el.msRequestFullscreen();
+      }
+    } catch (err){ console.warn('全屏异常：', err); }
+
+    /* 等全屏生效后再锁方向 */
+    setTimeout(function(){
+      setMsg('正在锁定方向...', null);
+      var locked = false;
+      try {
+        var so = screen.orientation || screen.mozOrientation || screen.msOrientation;
+        if (so && typeof so.lock === 'function'){
+          var p2 = so.lock('landscape');
+          if (p2 && p2.then){
+            p2.then(function(){
+              setMsg('✅ 已强制横屏', true);
+              setTimeout(function(){
+                var hint = document.getElementById('rotateHint');
+                if (hint && window.matchMedia('(orientation: landscape)').matches){
+                  hint.style.display = 'none';
+                }
+              }, 600);
+            }).catch(function(err){
+              console.warn('方向锁定失败：', err);
+              setMsg('❌ 请手动旋转手机', false);
+            });
+            return;
+          }
+          locked = true;
+        } else if (typeof screen.lockOrientation === 'function'){
+          screen.lockOrientation('landscape'); locked = true;
+        } else if (typeof screen.mozLockOrientation === 'function'){
+          screen.mozLockOrientation('landscape'); locked = true;
+        } else if (typeof screen.msLockOrientation === 'function'){
+          screen.msLockOrientation('landscape'); locked = true;
+        }
+      } catch (err){ console.warn('方向锁定异常：', err); }
+
+      if (locked){
+        setMsg('✅ 已强制横屏', true);
+        setTimeout(function(){
+          var hint = document.getElementById('rotateHint');
+          if (hint && window.matchMedia('(orientation: landscape)').matches){
+            hint.style.display = 'none';
+          }
+        }, 600);
+      } else {
+        setMsg('❌ 请手动旋转手机', false);
+      }
+    }, 300);
+  }
+
+  /* 绑定按钮 —— 独立于共享 js，绑定时机最优先 */
+  function bindForceBtn(){
+    var btn = document.getElementById('forceLandscape');
+    if (!btn) return;
+    var lastFire = 0;
+    var fire = function(e){
+      if (e) { e.preventDefault(); e.stopPropagation(); }
+      var now = Date.now();
+      if (now - lastFire < 500) return;
+      lastFire = now;
+      tryForceLandscape();
+    };
+    btn.addEventListener('touchstart', fire, { passive: false });
+    btn.addEventListener('click', fire, false);
+    btn.addEventListener('touchend', fire, { passive: false });
+  }
+
+  if (document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', bindForceBtn);
+  } else {
+    bindForceBtn();
+  }
+
+  /* 方向变化时自动隐藏提示 */
+  function checkOri(){
+    if (window.matchMedia('(orientation: landscape)').matches){
+      var hint = document.getElementById('rotateHint');
+      if (hint) hint.style.display = 'none';
+    }
+  }
+  window.addEventListener('resize', checkOri);
+  window.addEventListener('orientationchange', checkOri);
+
+  /* ---------- 全局错误捕获（只在 vConsole 里能看到，不影响用户体验） ---------- */
+  window.addEventListener('error', function(ev){
+    console.error('[DUEL/ERROR]', ev.message, ev.filename, ev.lineno);
+  });
+})();
+</script>
+
+<!-- ============================================================
+     Three.js
+     ============================================================ -->
+<script src="../three.min.js"></script>
+
+<!-- ============================================================
+     全局 scene / camera 占位（后面的 effects.js 等会用到）
+     ============================================================ -->
+<script>
+(function(){
+  if (typeof THREE === 'undefined') return;
+  window.scene  = new THREE.Scene();
+  window.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.05, 300);
+  window.camera.rotation.order = 'YXZ';
+  window.scene.add(window.camera);
+})();
+</script>
+
+<!-- ============================================================
+     共享工具 / 模型库（安全加载，失败也不影响横屏按钮）
+     ============================================================ -->
+<script src="../js/core/utils.js"></script>
+<script src="../js/core/textures.js"></script>
+<script src="../js/core/audio.js"></script>
+<script src="../js/core/effects.js"></script>
+<script src="../js/entities/enemy_data.js"></script>
+<script src="../js/entities/enemy_model.js"></script>
+
+<!-- ============================================================
+     1v1 主逻辑
+     ============================================================ -->
+<script src="duel.js"></script>
+
+</body>
+</html>

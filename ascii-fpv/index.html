@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>ASCII FPV · 楼宇穿越</title>
+<style>
+  html,body{margin:0;padding:0;height:100%;background:#000;overflow:hidden;
+    font-family:"Cascadia Mono","Consolas","DejaVu Sans Mono","Courier New",monospace;color:#7dffb0;
+    user-select:none;-webkit-user-select:none}
+  #screen{display:block;position:absolute;left:0;top:0;background:#000;cursor:crosshair}
+  #overlay{position:absolute;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;
+    background:rgba(0,0,0,.80);z-index:10;cursor:pointer}
+  #panel{border:1px solid #1f7a4d;padding:20px 26px;max-width:680px;background:#000806;
+    box-shadow:0 0 40px #063d24 inset,0 0 30px #021;line-height:1.75;font-size:14px}
+  #panel h1{margin:0 0 4px;font-size:20px;color:#9dffcb;letter-spacing:3px}
+  #panel h2{margin:0 0 14px;font-size:12px;color:#2f9a63;letter-spacing:2px;font-weight:400}
+  #panel table{border-collapse:collapse;margin:6px 0 10px}
+  #panel td{padding:1px 14px 1px 0;font-size:13px;color:#8fe8b8}
+  kbd{display:inline-block;min-width:16px;text-align:center;border:1px solid #2f9a63;border-bottom-width:2px;
+    padding:0 5px;border-radius:3px;color:#d6ffe8;background:#04140d;font-size:12px}
+  .dim{color:#39875f}
+  .go{margin-top:12px;color:#c9ffe2;letter-spacing:2px;animation:bl 1.1s steps(2) infinite}
+  @keyframes bl{50%{opacity:.25}}
+
+  #keyhelp{
+    position:absolute;right:16px;top:16px;z-index:20;
+    border:1px solid #1f7a4d;background:rgba(0,8,6,.93);
+    box-shadow:0 0 26px #063d24 inset,0 0 16px #021;
+    padding:10px 16px 12px;font-size:13px;line-height:1.95;color:#8fe8b8;
+    pointer-events:none;display:none;white-space:nowrap}
+  #keyhelp.show{display:block}
+  #keyhelp h3{margin:0 0 6px;font-size:12px;color:#9dffcb;letter-spacing:2px;font-weight:400;
+    border-bottom:1px solid #144a30;padding-bottom:4px}
+  #keyhelp table{border-collapse:collapse}
+  #keyhelp td{padding:0 16px 0 0;vertical-align:top}
+  #keyhelp td:first-child{color:#d6ffe8;text-align:right}
+  #keyhelp .note{color:#39875f;font-size:11px;margin-top:6px;letter-spacing:1px}
+</style>
+</head>
+<body>
+<canvas id="screen"></canvas>
+
+<div id="keyhelp">
+  <h3>按键说明 · ENTER 关闭</h3>
+  <table>
+    <tr><td><kbd>W</kbd> <kbd>S</kbd></td><td>俯仰角 −/+（±45° 限幅）</td></tr>
+    <tr><td><kbd>A</kbd> <kbd>D</kbd></td><td>滚转速率 −/+（±45° 限幅）</td></tr>
+    <tr><td><kbd>Z</kbd> <kbd>X</kbd></td><td>加速 / 减速（10 ~ 50 m/s）</td></tr>
+    <tr><td>鼠标左键</td><td>按住拖动 = 虚拟摇杆</td></tr>
+    <tr><td><kbd>R</kbd></td><td>坠机后重生</td></tr>
+    <tr><td><kbd>F</kbd></td><td>全屏 / 退出全屏</td></tr>
+    <tr><td><kbd>[</kbd> <kbd>]</kbd></td><td>缩小 / 放大字符</td></tr>
+    <tr><td><kbd>H</kbd></td><td>HUD 开关</td></tr>
+    <tr><td><kbd>C</kbd></td><td>碰撞检测开关</td></tr>
+    <tr><td><kbd>P</kbd></td><td>暂停 / 继续</td></tr>
+    <tr><td><kbd>Enter</kbd></td><td>显示 / 隐藏本提示</td></tr>
+  </table>
+  <div class="note">按 [ 或 ] 可随时调整字符大小</div>
+</div>
+
+<div id="overlay"><div id="panel">
+  <h1>ASCII&nbsp;FPV&nbsp;&nbsp;楼宇穿越</h1>
+  <h2>全部画面由彩色 ASCII 字符排列而成 · 非真 3D 渲染</h2>
+  <table>
+    <tr><td><kbd>W</kbd> / <kbd>S</kbd></td><td>减小 / 增加俯仰角（±45° 限幅）</td></tr>
+    <tr><td><kbd>A</kbd> / <kbd>D</kbd></td><td>滚转角速率控制（±45° 限幅）</td></tr>
+    <tr><td><kbd>Z</kbd> / <kbd>X</kbd></td><td>加速 / 减速（10 ~ 50 m/s）</td></tr>
+    <tr><td><kbd>鼠标左键</kbd></td><td>按住拖动 = 虚拟摇杆（水平滚转 / 垂直俯仰）</td></tr>
+    <tr><td><kbd>F</kbd></td><td>全屏 / 退出全屏</td></tr>
+    <tr><td><kbd>[</kbd> <kbd>]</kbd></td><td>缩小 / 放大字符（调整分辨率）</td></tr>
+    <tr><td><kbd>R</kbd></td><td>坠机后重生</td></tr>
+    <tr><td><kbd>H</kbd> / <kbd>C</kbd> / <kbd>P</kbd></td><td>HUD 开关 / 碰撞开关 / 暂停</td></tr>
+    <tr><td><kbd>Enter</kbd></td><td>呼出 / 关闭按键提示悬浮窗</td></tr>
+  </table>
+  <div class="dim">滚转 45° 时偏航角速度线性到达 90°/s，构成协调转弯。<br>
+  灰蓝色 <b>#</b> 为楼房（琥珀色为亮着的窗户），绿色 <b>&amp;</b> 为树木，灰色 <b>=</b> 与黄色虚线为道路，天空为黑底。<br>
+  觉得字太大/太小，进游戏后按 <b>[</b> 或 <b>]</b> 调整，可自动记忆。</div>
+  <div class="go">▶ 点击任意处 / 按任意键 起飞</div>
+</div></div>
+<script>
+'use strict';
+var DEG = Math.PI / 180;
+function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+function mod(a, n) { return ((a % n) + n) % n; }
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    var t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function hash3(a, b, c) {
+  var h = Math.imul(a ^ 0x9E3779B9, 2246822519);
+  h = Math.imul(h ^ b ^ 0x85EBCA6B, 3266489917);
+  h = Math.imul(h ^ c ^ 0x27D4EB2F, 668265263);
+  h ^= h >>> 15;
+  return (h >>> 0) / 4294967296;
+}
+function pad(v, n) { var s = String(v); while (s.length < n) s = ' ' + s; return s; }
+function sgnNum(v) { var r = Math.round(v); return (r < 0 ? '-' : '+') + pad(Math.abs(r), 2).replace(' ', '0'); }
+
+var LEVELS = 14;
+var PAL = [];
+function makeMat(rgb, ramp, ambient) {
+  if (ambient === undefined) ambient = 0.26;
+  var base = PAL.length;
+  var chars = new Uint16Array(LEVELS);
+  for (var i = 0; i < LEVELS; i++) {
+    var t = i / (LEVELS - 1);
+    var k = ambient + (1 - ambient) * t;
+    PAL.push('rgb(' + (rgb[0] * k | 0) + ',' + (rgb[1] * k | 0) + ',' + (rgb[2] * k | 0) + ')');
+    chars[i] = ramp.charCodeAt(Math.min(ramp.length - 1, Math.round(t * (ramp.length - 1))));
+  }
+  return { pal: base, chars: chars };
+}
+function solid(r, g, b) { PAL.push('rgb(' + r + ',' + g + ',' + b + ')'); return PAL.length - 1; }
+
+var WALLRAMP = " .:-=+*###";
+var M_WALL = [
+  makeMat([150, 172, 208], WALLRAMP),
+  makeMat([200, 180, 156], WALLRAMP),
+  makeMat([138, 146, 160], WALLRAMP),
+  makeMat([118, 168, 182], WALLRAMP)
+];
+var M_ROOF  = makeMat([132, 106,  88], " ...::;;;++");
+var M_WINL  = makeMat([255, 214, 118], " ..:=+*#%@@");
+var M_WIND  = makeMat([46,  62,  96],  " ...:::;;;;");
+var M_ROAD  = makeMat([78,  90, 116],  " ..::----==");
+var M_WALK  = makeMat([176, 176, 182], " ...::::;;;");
+var M_MARK  = makeMat([238, 200,  84], " ..::====##");
+var M_GRASS = makeMat([60,  94,  56],  "  ...,,,,''");
+var M_LEAF  = makeMat([88, 184,  92],  " .,:;o*&%@@");
+var M_TRUNK = makeMat([140, 100,  62], " ..::||||##");
+
+var C_HUD  = solid(70, 255, 158);
+var C_HUD2 = solid(24, 132, 82);
+var C_WARN = solid(255, 92, 68);
+var C_WHT  = solid(214, 240, 255);
+var C_AMB  = solid(255, 190, 70);
+
+var BLOCK = 64;
+var ROADW = 16;
+var TILES = 24;
+var blocks = new Array(TILES * TILES);
+
+function mkTree(x, z, rnd) {
+  var h = 7 + rnd() * 7.5;
+  return { x: x, z: z, h: h, r: h * (0.28 + 0.10 * rnd()), seed: (rnd() * 1e9) | 0 };
+}
+function genWorld() {
+  for (var bz = 0; bz < TILES; bz++) {
+    for (var bx = 0; bx < TILES; bx++) {
+      var rnd = mulberry32((bx * 73856093) ^ (bz * 19349663) ^ 0x5f3a71);
+      var buildings = [], trees = [];
+      var dh = (Math.sin(bx * 0.62 + 0.7) * Math.cos(bz * 0.51 - 1.1) + 1) / 2;
+      var i0 = ROADW + 5, i1 = BLOCK - 3, span = i1 - i0;
+      function hgt(big) {
+        var h = 11 + Math.pow(dh, 1.7) * (big ? 155 : 96) * (0.55 + 0.9 * rnd());
+        if (dh > 0.72 && rnd() > 0.72) h *= 1.45;
+        return Math.min(h, 215);
+      }
+      function push(x, z, w, d, h) {
+        buildings.push({
+          x: x, z: z, w: w, d: d, h: h,
+          mat: (rnd() * 4) | 0, seed: (rnd() * 1e9) | 0, lit: 0.14 + rnd() * 0.42
+        });
+      }
+      if (rnd() < 0.20) {
+        var w = span * (0.68 + 0.30 * rnd()), d = span * (0.68 + 0.30 * rnd());
+        push(i0 + (span - w) * rnd(), i0 + (span - d) * rnd(), w, d, hgt(true));
+      } else {
+        var half = span / 2;
+        for (var q = 0; q < 4; q++) {
+          var qx = i0 + (q & 1) * half, qz = i0 + (q >> 1) * half;
+          if (rnd() < 0.20) {
+            var nt = 2 + ((rnd() * 4) | 0);
+            for (var k = 0; k < nt; k++) trees.push(mkTree(qx + 2 + rnd() * (half - 4), qz + 2 + rnd() * (half - 4), rnd));
+            continue;
+          }
+          var bw = half * (0.52 + 0.42 * rnd()), bd = half * (0.52 + 0.42 * rnd());
+          push(qx + (half - 2 - bw) * rnd(), qz + (half - 2 - bd) * rnd(), bw, bd, hgt(false));
+        }
+      }
+      var line = ROADW - 1.4;
+      for (var t = 0; t < 7; t++) {
+        var p = ROADW + 4 + t * 8.6;
+        if (p > BLOCK - 3) break;
+        if (rnd() < 0.62) trees.push(mkTree(p + rnd() * 1.6, line - rnd() * 1.2, rnd));
+        if (rnd() < 0.62) trees.push(mkTree(line - rnd() * 1.2, p + rnd() * 1.6, rnd));
+      }
+      blocks[bz * TILES + bx] = { buildings: buildings, trees: trees };
+    }
+  }
+}
+genWorld();
+
+var START = { x: ROADW * 0.5, y: 70, z: -56, yaw: 0, pitch: 0, roll: 0, spd: 26 };
+var camX, camY, camZ, yaw, pitch, roll, spd;
+var flown = 0, best = 0, crashed = 0, paused = false, hudOn = true, collideOn = true, fpsVal = 0;
+var crashTimer = 0;
+try { best = parseFloat(localStorage.getItem('asciifpv.best') || '0') || 0; } catch (e) { }
+var bestSaved = best;
+function respawn() {
+  camX = START.x; camY = START.y; camZ = START.z;
+  yaw = START.yaw; pitch = START.pitch; roll = START.roll; spd = START.spd;
+  flown = 0; crashed = 0; crashTimer = 0;
+}
+respawn();
+
+var fwX, fwY, fwZ, rtX, rtY, rtZ, upX, upY, upZ;
+function updateBasis() {
+  var sy = Math.sin(yaw * DEG), cy = Math.cos(yaw * DEG);
+  var sp = Math.sin(pitch * DEG), cp = Math.cos(pitch * DEG);
+  var sr = Math.sin(roll * DEG), cr = Math.cos(roll * DEG);
+  var f0x = sy, f0z = cy;
+  var r0x = cy, r0z = -sy;
+  fwX = f0x * cp; fwY = sp; fwZ = f0z * cp;
+  var u1x = -f0x * sp, u1y = cp, u1z = -f0z * sp;
+  rtX = r0x * cr - u1x * sr; rtY = -u1y * sr; rtZ = r0z * cr - u1z * sr;
+  upX = u1x * cr + r0x * sr; upY = u1y * cr;                 upZ = u1z * cr + r0z * sr;
+}
+
+var FONT = '"Cascadia Mono","Consolas","DejaVu Sans Mono","Courier New",monospace';
+var canvas = document.getElementById('screen');
+var ctx = canvas.getContext('2d', { alpha: false });
+var COLS = 0, ROWS = 0, cellW = 10, cellH = 18, offX = 0, offY = 0, baseY = 14;
+var FONTSPEC = '16px ' + FONT, LSPACE = '0px', hasLS = ('letterSpacing' in ctx);
+var chars, colr, zbuf;
+
+/* [FIX] 改为通过缩放系数计算列数，全屏或调整窗口时自动适应比例 */
+var colScale = 8.0;
+try { 
+  var savedScale = parseFloat(localStorage.getItem('asciifpv.colscale') || '0');
+  if (savedScale >= 4 && savedScale <= 20) colScale = savedScale;
+} catch (e) {}
+
+var FOVX = 86 * DEG, NEAR = 0.45, VIEW = 620, FOGD = 420;
+var cxF = 0, cyF = 0, sxS = 1, syS = 1, hTan = 1, vTan = 1;
+
+function setupGrid() {
+  var dpr = Math.min(2, window.devicePixelRatio || 1);
+  var cssW = Math.max(320, window.innerWidth);
+  var cssH = Math.max(240, window.innerHeight);
+
+  // [FIX] 动态计算列数
+  var targetCols = clamp(Math.round(cssW / colScale), 80, 400);
+
+  var MAXPIX = 3840 * 2160;
+  if (cssW * cssH * dpr * dpr > MAXPIX) {
+    dpr = Math.max(1, Math.sqrt(MAXPIX / (cssW * cssH)));
+  }
+  canvas.width = Math.max(320, Math.floor(cssW * dpr));
+  canvas.height = Math.max(240, Math.floor(cssH * dpr));
+  canvas.style.width = cssW + 'px';
+  canvas.style.height = cssH + 'px';
+
+  var fpx = Math.max(6, canvas.width / (targetCols * 0.6));
+  FONTSPEC = fpx.toFixed(2) + 'px ' + FONT;
+  if (hasLS) ctx.letterSpacing = '0px';
+  ctx.font = FONTSPEC;
+  var adv = ctx.measureText('MMMMMMMMMM').width / 10;
+  if (hasLS) { cellW = Math.max(4, Math.round(adv)); LSPACE = (cellW - adv).toFixed(3) + 'px'; }
+  else { cellW = Math.max(4, adv); LSPACE = '0px'; }
+  cellH = Math.max(5, Math.round(fpx * 1.08));
+  baseY = Math.round(cellH * 0.80);
+  COLS = Math.max(40, Math.floor(canvas.width / cellW));
+  ROWS = Math.max(20, Math.floor(canvas.height / cellH));
+  offX = Math.floor((canvas.width - COLS * cellW) / 2);
+  offY = Math.floor((canvas.height - ROWS * cellH) / 2);
+  chars = new Uint16Array(COLS * ROWS);
+  colr = new Uint16Array(COLS * ROWS);
+  zbuf = new Float32Array(COLS * ROWS);
+  cxF = COLS * 0.5; cyF = ROWS * 0.5;
+  sxS = (COLS * 0.5) / Math.tan(FOVX * 0.5);
+  syS = sxS * (cellW / cellH);
+  hTan = (COLS * 0.5) / sxS * 1.15;
+  vTan = (ROWS * 0.5) / syS * 1.15;
+}
+
+var OUT_C = 32, OUT_S = 0;
+function setStyle(m, b, ch) {
+  var lv = (b * LEVELS) | 0;
+  if (lv < 0) lv = 0; else if (lv >= LEVELS) lv = LEVELS - 1;
+  OUT_S = m.pal + lv;
+  OUT_C = ch > 0 ? ch : m.chars[lv];
+}
+function fogAt(d) { return Math.exp(-d / FOGD); }
+
+var WINU = 4.6, WINV = 3.7;
+var FACE = { kind: 0, mat: M_WALL[0], light: 1, uMax: 1, vMax: 1, seed: 0, lit: 0.3 };
+function shadeFace(u, v, dist) {
+  var fg = fogAt(dist);
+  var ppc = dist / sxS;
+  if (FACE.kind === 0) {
+    var b = FACE.light * fg;
+    var eW = Math.min(2.4, 0.5 + 0.55 * ppc);
+    if (u < eW || u > FACE.uMax - eW || v > FACE.vMax - eW) {
+      setStyle(FACE.mat, b * 1.55 + 0.10, 35); return;
+    }
+    if (v > 4.4 && v < FACE.vMax - 2.0 && ppc < 2.6) {
+      var wu = u - Math.floor(u / WINU) * WINU, wv = v - Math.floor(v / WINV) * WINV;
+      if (wu > 1.15 && wu < WINU - 1.15 && wv > 0.95 && wv < WINV - 1.0) {
+        if (hash3(FACE.seed, Math.floor(u / WINU), Math.floor(v / WINV)) < FACE.lit) setStyle(M_WINL, fg * 1.05, 0);
+        else setStyle(M_WIND, fg * 0.5, 0);
+        return;
+      }
+    }
+    setStyle(FACE.mat, b, 0);
+  } else {
+    var rb = FACE.light * fg;
+    var pW = Math.min(3.6, 0.9 + 0.8 * ppc);
+    if (u < pW || u > FACE.uMax - pW || v < pW || v > FACE.vMax - pW) { setStyle(M_ROOF, rb * 1.3 + 0.08, 35); return; }
+    var n = hash3(FACE.seed ^ 0x77, Math.floor(u * 0.5), Math.floor(v * 0.5));
+    if (n > 0.9) { setStyle(M_ROOF, rb * 1.25, 61); return; }
+    setStyle(M_ROOF, rb * (0.78 + 0.3 * n), 0);
+  }
+}
+
+var PVB = [], CVB = [], SPB = [], pvN = 0;
+for (var _i = 0; _i < 12; _i++) { PVB.push(new Float64Array(5)); CVB.push(new Float64Array(5)); SPB.push(new Float64Array(5)); }
+function pv(wx, wy, wz, u, v) {
+  var dx = wx - camX, dy = wy - camY, dz = wz - camZ, a = PVB[pvN++];
+  a[0] = dx * rtX + dy * rtY + dz * rtZ;
+  a[1] = dx * upX + dy * upY + dz * upZ;
+  a[2] = dx * fwX + dy * fwY + dz * fwZ;
+  a[3] = u; a[4] = v;
+}
+function rasterTri(A, B, C) {
+  var minX = Math.floor(Math.min(A[0], B[0], C[0])); if (minX < 0) minX = 0;
+  var maxX = Math.ceil(Math.max(A[0], B[0], C[0])); if (maxX > COLS - 1) maxX = COLS - 1;
+  var minY = Math.floor(Math.min(A[1], B[1], C[1])); if (minY < 0) minY = 0;
+  var maxY = Math.ceil(Math.max(A[1], B[1], C[1])); if (maxY > ROWS - 1) maxY = ROWS - 1;
+  if (minX > maxX || minY > maxY) return;
+  var area = (B[0] - A[0]) * (C[1] - A[1]) - (B[1] - A[1]) * (C[0] - A[0]);
+  if (area > -1e-9 && area < 1e-9) return;
+  var inv = 1 / area;
+  for (var y = minY; y <= maxY; y++) {
+    var py = y + 0.5, row = y * COLS;
+    for (var x = minX; x <= maxX; x++) {
+      var px = x + 0.5;
+      var w0 = ((B[0] - px) * (C[1] - py) - (B[1] - py) * (C[0] - px)) * inv;
+      if (w0 < -1e-7) continue;
+      var w1 = ((C[0] - px) * (A[1] - py) - (C[1] - py) * (A[0] - px)) * inv;
+      if (w1 < -1e-7) continue;
+      var w2 = 1 - w0 - w1;
+      if (w2 < -1e-7) continue;
+      var iz = w0 * A[2] + w1 * B[2] + w2 * C[2];
+      var idx = row + x;
+      if (iz <= zbuf[idx]) continue;
+      var uu = (w0 * A[3] + w1 * B[3] + w2 * C[3]) / iz;
+      var vv = (w0 * A[4] + w1 * B[4] + w2 * C[4]) / iz;
+      shadeFace(uu, vv, 1 / iz);
+      chars[idx] = OUT_C; colr[idx] = OUT_S; zbuf[idx] = iz;
+    }
+  }
+}
+function drawPoly() {
+  var n = pvN; pvN = 0;
+  var src = PVB, cnt = n, i, k, need = false;
+  for (i = 0; i < n; i++) if (PVB[i][2] < NEAR) { need = true; break; }
+  if (need) {
+    cnt = 0;
+    for (i = 0; i < n; i++) {
+      var A = PVB[i], B = PVB[(i + 1) % n];
+      var ia = A[2] >= NEAR, ib = B[2] >= NEAR;
+      if (ia) { CVB[cnt++].set(A); if (cnt >= 11) break; }
+      if (ia !== ib) {
+        var t = (NEAR - A[2]) / (B[2] - A[2]), o = CVB[cnt++];
+        for (k = 0; k < 5; k++) o[k] = A[k] + (B[k] - A[k]) * t;
+        o[2] = NEAR;
+        if (cnt >= 11) break;
+      }
+    }
+    src = CVB;
+  }
+  if (cnt < 3) return;
+  for (i = 0; i < cnt; i++) {
+    var s = SPB[i], a = src[i], iz = 1 / a[2];
+    s[0] = cxF + a[0] * iz * sxS; s[1] = cyF - a[1] * iz * syS;
+    s[2] = iz; s[3] = a[3] * iz; s[4] = a[4] * iz;
+  }
+  for (i = 1; i + 1 < cnt; i++) rasterTri(SPB[0], SPB[i], SPB[i + 1]);
+}
+function drawLine3D(ax, ay, az, bx, by, bz, ch, mat, bright) {
+  var x0 = ax - camX, y0 = ay - camY, z0 = az - camZ;
+  var X0 = x0 * rtX + y0 * rtY + z0 * rtZ, Y0 = x0 * upX + y0 * upY + z0 * upZ, Z0 = x0 * fwX + y0 * fwY + z0 * fwZ;
+  var x1 = bx - camX, y1 = by - camY, z1 = bz - camZ;
+  var X1 = x1 * rtX + y1 * rtY + z1 * rtZ, Y1 = x1 * upX + y1 * upY + z1 * upZ, Z1 = x1 * fwX + y1 * fwY + z1 * fwZ;
+  if (Z0 < NEAR && Z1 < NEAR) return;
+  var t;
+  if (Z0 < NEAR) { t = (NEAR - Z0) / (Z1 - Z0); X0 += (X1 - X0) * t; Y0 += (Y1 - Y0) * t; Z0 = NEAR; }
+  else if (Z1 < NEAR) { t = (NEAR - Z1) / (Z0 - Z1); X1 += (X0 - X1) * t; Y1 += (Y0 - Y1) * t; Z1 = NEAR; }
+  var p0x = cxF + X0 / Z0 * sxS, p0y = cyF - Y0 / Z0 * syS, i0 = 1 / Z0;
+  var p1x = cxF + X1 / Z1 * sxS, p1y = cyF - Y1 / Z1 * syS, i1 = 1 / Z1;
+  var n = Math.ceil(Math.max(Math.abs(p1x - p0x), Math.abs(p1y - p0y)));
+  if (n < 1) n = 1; if (n > 400) return;
+  for (var kk = 0; kk <= n; kk++) {
+    var tt = kk / n, px = p0x + (p1x - p0x) * tt, py = p0y + (p1y - p0y) * tt, iz = i0 + (i1 - i0) * tt;
+    if (px < 0 || py < 0) continue;
+    var xi = px | 0, yi = py | 0;
+    if (xi >= COLS || yi >= ROWS) continue;
+    var idx = yi * COLS + xi;
+    if (iz <= zbuf[idx]) continue;
+    setStyle(mat, bright * fogAt(1 / iz), ch);
+    if (OUT_C !== 32) { chars[idx] = OUT_C; colr[idx] = OUT_S; zbuf[idx] = iz; }
+  }
+}
+
+function shadeGround(wx, wz, dist) {
+  var mx = wx - Math.floor(wx / BLOCK) * BLOCK, mz = wz - Math.floor(wz / BLOCK) * BLOCK;
+  var fg = fogAt(dist);
+  var rX = mx < ROADW, rZ = mz < ROADW;
+  if (rX || rZ) {
+    var sw = Math.min(3.4, 1.7 + 0.55 * (dist / sxS));
+    var eX = rX ? Math.min(mx, ROADW - mx) : 99, eZ = rZ ? Math.min(mz, ROADW - mz) : 99;
+    if (Math.min(eX, eZ) < sw) { setStyle(M_WALK, fg * 0.95, 0); return; }
+    if (dist < 175) {
+      if (rX && !rZ && Math.abs(mx - ROADW * 0.5) < 0.6 && (wz - Math.floor(wz / 9) * 9) < 4.5) { setStyle(M_MARK, fg * 1.1, 61); return; }
+      if (rZ && !rX && Math.abs(mz - ROADW * 0.5) < 0.6 && (wx - Math.floor(wx / 9) * 9) < 4.5) { setStyle(M_MARK, fg * 1.1, 61); return; }
+    }
+    setStyle(M_ROAD, fg * 0.88, 0); return;
+  }
+  var det = dist < 110 ? 1 : Math.max(0, 1 - (dist - 110) / 170);
+  var gs = 0.55 / (1 + dist / 220);
+  var n0 = hash3(Math.floor(wx * gs), Math.floor(wz * gs), 7);
+  if (n0 < 0.40) { setStyle(M_GRASS, 0, 0); return; }
+  var nn = 0.5 + (n0 - 0.5) * det;
+  setStyle(M_GRASS, fg * (0.45 + 0.6 * nn), 0);
+}
+function drawGround() {
+  if (camY <= 0.05) return;
+  for (var y = 0; y < ROWS; y++) {
+    var b = (cyF - (y + 0.5)) / syS, row = y * COLS;
+    var dyR = b * upY, byX = b * upX, byZ = b * upZ;
+    for (var x = 0; x < COLS; x++) {
+      var a = ((x + 0.5) - cxF) / sxS;
+      var dY = a * rtY + dyR + fwY;
+      if (dY > -1e-4) continue;
+      var t = camY / -dY;
+      if (t < NEAR || t > VIEW) continue;
+      var wx = camX + t * (a * rtX + byX + fwX);
+      var wz = camZ + t * (a * rtZ + byZ + fwZ);
+      var dist = t * Math.sqrt(a * a + b * b + 1);
+      shadeGround(wx, wz, dist);
+      var idx = row + x;
+      chars[idx] = OUT_C; colr[idx] = OUT_S; zbuf[idx] = 1 / t;
+    }
+  }
+}
+
+function quadWall(xa, za, xb, zb, h, mat, b, light) {
+  var len = Math.sqrt((xb - xa) * (xb - xa) + (zb - za) * (zb - za));
+  FACE.kind = 0; FACE.mat = mat; FACE.light = light; FACE.uMax = len; FACE.vMax = h;
+  FACE.seed = b.seed; FACE.lit = b.lit;
+  pvN = 0;
+  pv(xa, 0, za, 0, 0); pv(xb, 0, zb, len, 0); pv(xb, h, zb, len, h); pv(xa, h, za, 0, h);
+  drawPoly();
+}
+function drawBuilding(b, ox, oz) {
+  var x0 = ox + b.x, z0 = oz + b.z, x1 = x0 + b.w, z1 = z0 + b.d, h = b.h;
+  var dx = (x0 + x1) * 0.5 - camX, dy = h * 0.5 - camY, dz = (z0 + z1) * 0.5 - camZ;
+  var rad = 0.5 * Math.sqrt(b.w * b.w + b.d * b.d + h * h);
+  var zc = dx * fwX + dy * fwY + dz * fwZ;
+  if (zc < -rad) return;
+  var d2 = dx * dx + dy * dy + dz * dz;
+  if (d2 > (VIEW + rad) * (VIEW + rad)) return;
+  var lim = zc > 1 ? zc : 1;
+  if (Math.abs(dx * rtX + dy * rtY + dz * rtZ) - rad > lim * hTan) return;
+  if (Math.abs(dx * upX + dy * upY + dz * upZ) - rad > lim * vTan) return;
+  var mat = M_WALL[b.mat];
+  if (camX > x1) quadWall(x1, z0, x1, z1, h, mat, b, 0.88);
+  if (camX < x0) quadWall(x0, z1, x0, z0, h, mat, b, 0.50);
+  if (camZ > z1) quadWall(x1, z1, x0, z1, h, mat, b, 0.45);
+  if (camZ < z0) quadWall(x0, z0, x1, z0, h, mat, b, 0.72);
+  if (camY > h) {
+    FACE.kind = 1; FACE.mat = M_ROOF; FACE.light = 1.0; FACE.uMax = b.w; FACE.vMax = b.d;
+    FACE.seed = b.seed; FACE.lit = b.lit;
+    pvN = 0;
+    pv(x0, h, z0, 0, 0); pv(x1, h, z0, b.w, 0); pv(x1, h, z1, b.w, b.d); pv(x0, h, z1, 0, b.d);
+    drawPoly();
+  }
+}
+function drawTree(t, ox, oz) {
+  var wx = ox + t.x, wz = oz + t.z, fyc = t.h * 0.70;
+  var dx = wx - camX, dy = fyc - camY, dz = wz - camZ;
+  var zc = dx * fwX + dy * fwY + dz * fwZ;
+  if (zc < NEAR + t.r) return;
+  var dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+  if (dist > 330) return;
+  var xc = dx * rtX + dy * rtY + dz * rtZ, yc = dx * upX + dy * upY + dz * upZ;
+  var px = cxF + xc / zc * sxS, py = cyF - yc / zc * syS;
+  var rpx = sxS * t.r / zc, rpy = syS * t.r / zc;
+  if (px < -rpx - 2 || px > COLS + rpx + 2 || py < -rpy - 2 || py > ROWS + rpy + 2) return;
+  var fg = fogAt(dist);
+  var ex = rpx < 0.5 ? 0.5 : rpx, ey = rpy < 0.5 ? 0.5 : rpy;
+  var x0 = Math.floor(px - ex); if (x0 < 0) x0 = 0;
+  var x1 = Math.ceil(px + ex); if (x1 > COLS - 1) x1 = COLS - 1;
+  var y0 = Math.floor(py - ey); if (y0 < 0) y0 = 0;
+  var y1 = Math.ceil(py + ey); if (y1 > ROWS - 1) y1 = ROWS - 1;
+  for (var y = y0; y <= y1; y++) {
+    var ny = (y + 0.5 - py) / ey;
+    for (var x = x0; x <= x1; x++) {
+      var nx = (x + 0.5 - px) / ex;
+      var q = nx * nx + ny * ny;
+      if (q > 1) continue;
+      var zz = zc - t.r * Math.sqrt(1 - q) * 0.9, iz = 1 / zz;
+      var idx = y * COLS + x;
+      if (iz <= zbuf[idx]) continue;
+      var nse = hash3(t.seed, (nx * 3.5 + 16) | 0, (ny * 3.5 + 16) | 0);
+      setStyle(M_LEAF, fg * (0.55 + 0.45 * (1 - q)) * (0.72 + 0.5 * nse), 0);
+      if (OUT_C !== 32) { chars[idx] = OUT_C; colr[idx] = OUT_S; zbuf[idx] = iz; }
+    }
+  }
+  if (rpx > 0.9) drawLine3D(wx, 0, wz, wx, t.h * 0.62, wz, 124, M_TRUNK, 0.95);
+}
+function drawCity() {
+  var range = VIEW + 40;
+  var bx0 = Math.floor((camX - range) / BLOCK), bx1 = Math.floor((camX + range) / BLOCK);
+  var bz0 = Math.floor((camZ - range) / BLOCK), bz1 = Math.floor((camZ + range) / BLOCK);
+  for (var bz = bz0; bz <= bz1; bz++) {
+    for (var bx = bx0; bx <= bx1; bx++) {
+      var ox = bx * BLOCK, oz = bz * BLOCK;
+      var dx = ox + BLOCK * 0.5 - camX, dz = oz + BLOCK * 0.5 - camZ;
+      if (dx * dx + dz * dz > (range + 50) * (range + 50)) continue;
+      var dy = 45 - camY;
+      if (dx * fwX + dy * fwY + dz * fwZ < -95) continue;
+      var blk = blocks[mod(bz, TILES) * TILES + mod(bx, TILES)];
+      var i, arr = blk.buildings;
+      for (i = 0; i < arr.length; i++) drawBuilding(arr[i], ox, oz);
+      if (dx * dx + dz * dz < 340 * 340) {
+        arr = blk.trees;
+        for (i = 0; i < arr.length; i++) drawTree(arr[i], ox, oz);
+      }
+    }
+  }
+}
+
+function hudCh(x, y, ch, st) {
+  if (x < 0 || y < 0 || x >= COLS || y >= ROWS) return;
+  var i = y * COLS + x; chars[i] = ch; colr[i] = st; zbuf[i] = 1e18;
+}
+function hudStr(x, y, s, st) {
+  for (var i = 0; i < s.length; i++) { var c = s.charCodeAt(i); if (c !== 32) hudCh(x + i, y, c, st); }
+}
+function hudStrOp(x, y, s, st) {
+  for (var i = 0; i < s.length; i++) hudCh(x + i, y, s.charCodeAt(i), st);
+}
+function hudRow(y, ch, st) { for (var x = 0; x < COLS; x++) hudCh(x, y, ch, st); }
+
+function drawHorizon() {
+  var Ux = rtY, Uy = upY, Uz = fwY, i;
+  if (Math.abs(Uy) >= Math.abs(Ux) * 0.55) {
+    for (i = 0; i < COLS; i++) {
+      var a = (i + 0.5 - cxF) / sxS;
+      var bb = -(Uz + a * Ux) / Uy;
+      var py = Math.round(cyF - bb * syS - 0.5);
+      if (Math.abs(i - cxF) < 4.5) continue;
+      hudCh(i, py, 45, C_HUD2);
+    }
+  } else {
+    for (i = 0; i < ROWS; i++) {
+      var b2 = (cyF - (i + 0.5)) / syS;
+      var aa = -(Uz + b2 * Uy) / Ux;
+      var pxx = Math.round(cxF + aa * sxS - 0.5);
+      if (Math.abs(i - cyF) < 2.5) continue;
+      hudCh(pxx, i, 124, C_HUD2);
+    }
+  }
+}
+function ladderPt(azDeg, elDeg, out) {
+  var ca = Math.cos(azDeg * DEG), sa = Math.sin(azDeg * DEG);
+  var ce = Math.cos(elDeg * DEG), se = Math.sin(elDeg * DEG);
+  var dx = sa * ce, dy = se, dz = ca * ce;
+  var Z = dx * fwX + dy * fwY + dz * fwZ;
+  if (Z < 0.08) return false;
+  out[0] = cxF + (dx * rtX + dy * rtY + dz * rtZ) / Z * sxS;
+  out[1] = cyF - (dx * upX + dy * upY + dz * upZ) / Z * syS;
+  return true;
+}
+var LP0 = [0, 0], LP1 = [0, 0];
+function drawLadder() {
+  for (var k = -40; k <= 40; k += 10) {
+    if (k === 0) continue;
+    for (var s = -1; s <= 1; s += 2) {
+      if (!ladderPt(yaw + s * 4.5, k, LP0)) continue;
+      if (!ladderPt(yaw + s * 14, k, LP1)) continue;
+      var n = Math.ceil(Math.max(Math.abs(LP1[0] - LP0[0]), Math.abs(LP1[1] - LP0[1])));
+      if (n < 1) n = 1; if (n > 200) continue;
+      for (var i = 0; i <= n; i++) {
+        if (k < 0 && (i & 1)) continue;
+        var t = i / n;
+        hudCh(Math.round(LP0[0] + (LP1[0] - LP0[0]) * t - 0.5),
+              Math.round(LP0[1] + (LP1[1] - LP0[1]) * t - 0.5), k > 0 ? 45 : 46, C_HUD2);
+      }
+      var lb = pad(Math.abs(k), 2);
+      hudStr(Math.round(LP1[0] - 0.5) + (s > 0 ? 1 : -3), Math.round(LP1[1] - 0.5), lb, C_HUD2);
+    }
+  }
+}
+function drawHUD() {
+  var cx = Math.round(cxF - 0.5), cy = Math.round(cyF - 0.5);
+  var hdg = Math.round(mod(yaw, 360)) % 360;
+  drawHorizon();
+  drawLadder();
+
+  hudStr(cx - 10, cy, "-----", C_HUD);
+  hudStr(cx + 6, cy, "-----", C_HUD);
+  hudStr(cx - 2, cy, "[+]", C_HUD);
+
+  var half = Math.min(38, (COLS >> 2));
+  var a0 = Math.ceil((hdg - half * 2) / 10) * 10;
+  for (var a = a0; a <= hdg + half * 2; a += 10) {
+    var xx = cx + Math.round((a - hdg) / 2);
+    var av = mod(a, 360);
+    hudCh(xx, 0, (av % 30 === 0) ? 124 : 39, C_HUD2);
+    if (av % 30 === 0) {
+      var lab = av === 0 ? " N " : av === 90 ? " E " : av === 180 ? " S " : av === 270 ? " W " : pad(av, 3).replace(/ /g, '0');
+      hudStr(xx - 1, 1, lab, C_HUD2);
+    }
+  }
+  hudStrOp(cx - 2, 2, "[" + pad(hdg, 3).replace(/ /g, '0') + "]", C_WHT);
+
+  var TX = 9, rowsHalf = Math.min(10, (ROWS >> 2));
+  hudStr(TX - 5, cy - rowsHalf - 2, "SPD", C_HUD2);
+  for (var v = Math.ceil((spd - rowsHalf * 2) / 5) * 5; v <= spd + rowsHalf * 2; v += 5) {
+    if (v < 0) continue;
+    var vy = cy - Math.round((v - spd) / 2);
+    if (vy < 3 || vy > ROWS - 5) continue;
+    if (v % 10 === 0) { hudStr(TX - 1, vy, "--", C_HUD2); hudStr(TX - 5, vy, pad(v, 3), C_HUD2); }
+    else hudCh(TX, vy, 45, C_HUD2);
+  }
+  hudStrOp(TX - 5, cy, "[" + pad(Math.round(spd), 3) + "]", C_WHT);
+
+  var AX = COLS - 10;
+  hudStr(AX + 2, cy - rowsHalf - 2, "ALT", C_HUD2);
+  var alt = camY;
+  for (var h = Math.ceil((alt - rowsHalf * 5) / 10) * 10; h <= alt + rowsHalf * 5; h += 10) {
+    if (h < 0) continue;
+    var hy = cy - Math.round((h - alt) / 5);
+    if (hy < 3 || hy > ROWS - 5) continue;
+    if (h % 20 === 0) { hudStr(AX - 1, hy, "--", C_HUD2); hudStr(AX + 2, hy, pad(h, 3), C_HUD2); }
+    else hudCh(AX, hy, 45, C_HUD2);
+  }
+  hudStrOp(AX + 1, cy, "[" + pad(Math.round(alt), 3) + "]", C_WHT);
+
+  var by = ROWS - 6, sc = Math.min(18, (COLS >> 3));
+  var ticks = [-45, -30, -15, 0, 15, 30, 45];
+  for (var ti = 0; ti < ticks.length; ti++) {
+    var tx = cx + Math.round(ticks[ti] / 45 * sc);
+    hudCh(tx, by, ticks[ti] === 0 ? 43 : 39, C_HUD2);
+  }
+  hudCh(cx + Math.round(roll / 45 * sc), by - 1, 94, Math.abs(roll) > 44 ? C_AMB : C_HUD);
+
+  hudRow(ROWS - 3, 45, C_HUD2);
+  hudRow(ROWS - 2, 32, C_HUD2);
+  hudRow(ROWS - 1, 32, C_HUD2);
+  var line = 'SPD ' + pad(spd.toFixed(1), 4) + ' M/S   ALT ' + pad(Math.round(camY), 3) +
+    ' M   HDG ' + pad(hdg, 3).replace(/ /g, '0') + '   BNK ' + sgnNum(roll) + '   PIT ' + sgnNum(pitch) +
+    '   VS ' + sgnNum(spd * Math.sin(pitch * DEG)) + ' M/S   DIST ' + (flown / 1000).toFixed(2) +
+    ' KM   BEST ' + (best / 1000).toFixed(2) + ' KM';
+  hudStrOp(1, ROWS - 2, line.substring(0, COLS - 2), C_HUD);
+  var hint = 'ENTER KEYS  W/S PITCH  A/D ROLL  Z/X THROTTLE  LMB STICK  F FULLSCREEN  R RESET  [ ] ZOOM  H HUD  C CRASH:' +
+    (collideOn ? 'ON ' : 'OFF') + '  P PAUSE';
+  hudStrOp(1, ROWS - 1, hint.substring(0, COLS - 2), C_HUD2);
+  var tag = COLS + 'x' + ROWS + ' CHARS  ' + pad(fpsVal, 3) + ' FPS';
+  if (COLS - 2 - tag.length > hint.length + 3) hudStrOp(COLS - 2 - tag.length, ROWS - 1, tag, C_HUD2);
+
+  if (Math.abs(roll) > 44.5) hudStr(cx - 4, cy - 3, "BANK LIM", C_AMB);
+  if (Math.abs(pitch) > 44.5) hudStr(cx - 5, cy + 3, "PITCH LIM", C_AMB);
+  if (camY < 25 && !crashed) hudStr(cx - 5, cy + 5, "LOW  ALT", C_WARN);
+  if (paused) hudStrOp(cx - 3, cy - 5, " PAUSE ", C_AMB);
+}
+function hudBox(x, y, w, h) {
+  for (var j = 0; j <= h; j++) {
+    for (var i = 0; i <= w; i++) {
+      var ch = 32, st = C_WARN;
+      if ((j === 0 || j === h) && (i === 0 || i === w)) ch = 43;
+      else if (j === 0 || j === h) ch = 45;
+      else if (i === 0 || i === w) ch = 124;
+      hudCh(x + i, y + j, ch, st);
+    }
+  }
+}
+function drawCrash() {
+  var cx = Math.round(cxF - 0.5), cy = Math.round(cyF - 0.5);
+  var w = 30, h = 6, x = cx - (w >> 1), y = cy - (h >> 1);
+  hudBox(x, y, w, h);
+  hudStrOp(x + 9, y + 1, "* CRASHED *", C_WARN);
+  hudStrOp(x + 4, y + 2, "DIST " + pad((flown / 1000).toFixed(2), 6) + " KM", C_WHT);
+  hudStrOp(x + 4, y + 3, "BEST " + pad((best / 1000).toFixed(2), 6) + " KM", C_WHT);
+  hudStrOp(x + 5, y + 5, "R RESPAWN  AUTO 2S", C_AMB);
+}
+
+function blit() {
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.font = FONTSPEC;
+  if (hasLS) ctx.letterSpacing = LSPACE;
+  ctx.textBaseline = 'alphabetic';
+  ctx.textAlign = 'left';
+  for (var y = 0; y < ROWS; y++) {
+    var row = y * COLS, yy = offY + y * cellH + baseY, x = 0;
+    while (x < COLS) {
+      var c = chars[row + x];
+      if (c === 32 || c === 0) { x++; continue; }
+      var st = colr[row + x], x2 = x + 1;
+      while (x2 < COLS) { var c2 = chars[row + x2]; if (c2 === 32 || c2 === 0 || colr[row + x2] !== st) break; x2++; }
+      var str = '';
+      for (var k = x; k < x2; k++) str += String.fromCharCode(chars[row + k]);
+      ctx.fillStyle = PAL[st];
+      ctx.fillText(str, offX + x * cellW, yy);
+      x = x2;
+    }
+  }
+}
+function render() {
+  updateBasis();
+  chars.fill(32); colr.fill(0); zbuf.fill(0);
+  drawGround();
+  drawCity();
+  if (hudOn) drawHUD();
+  if (crashed) drawCrash();
+  blit();
+}
+
+var PITCH_RATE = 28, ROLL_RATE = 72, ACC = 9, LIMIT = 45, YAW_AT_LIMIT = 90;
+var keys = Object.create(null);
+var mouseActive = false, mRoll = 0, mPitch = 0;
+function physics(dt) {
+  if (keys.KeyA) roll -= ROLL_RATE * dt;
+  if (keys.KeyD) roll += ROLL_RATE * dt;
+  if (keys.KeyW) pitch -= PITCH_RATE * dt;
+  if (keys.KeyS) pitch += PITCH_RATE * dt;
+  if (mouseActive) {
+    roll  += mRoll  * ROLL_RATE  * dt;
+    pitch -= mPitch * PITCH_RATE * dt;
+  }
+  roll = clamp(roll, -LIMIT, LIMIT);
+  pitch = clamp(pitch, -LIMIT, LIMIT);
+  yaw = mod(yaw + (roll / LIMIT) * YAW_AT_LIMIT * dt, 360);
+  if (keys.KeyZ) spd += ACC * dt;
+  if (keys.KeyX) spd -= ACC * dt;
+  spd = clamp(spd, 10, 50);
+
+  updateBasis();
+  camX += fwX * spd * dt; camY += fwY * spd * dt; camZ += fwZ * spd * dt;
+  flown += spd * dt;
+  if (flown > best) {
+    best = flown;
+    if (best - bestSaved > 500) { bestSaved = best; try { localStorage.setItem('asciifpv.best', String(best)); } catch (e) { } }
+  }
+  if (camY > 480) { camY = 480; if (pitch > 0) pitch = 0; }
+
+  if (collideOn) {
+    var hit = collide();
+    if (hit) {
+      crashed = hit;
+      crashTimer = 0;
+      bestSaved = best;
+      try { localStorage.setItem('asciifpv.best', String(best)); } catch (e) { }
+    }
+  } else if (camY < 1.2) { camY = 1.2; if (pitch < 0) pitch = 0; }
+}
+function collide() {
+  if (camY < 1.2) return 1;
+  var bxA = Math.floor(camX / BLOCK), bzA = Math.floor(camZ / BLOCK);
+  for (var j = -1; j <= 1; j++) {
+    for (var i = -1; i <= 1; i++) {
+      var blk = blocks[mod(bzA + j, TILES) * TILES + mod(bxA + i, TILES)];
+      var ox = (bxA + i) * BLOCK, oz = (bzA + j) * BLOCK, arr = blk.buildings;
+      for (var k = 0; k < arr.length; k++) {
+        var b = arr[k];
+        if (camX > ox + b.x - 1.1 && camX < ox + b.x + b.w + 1.1 &&
+            camZ > oz + b.z - 1.1 && camZ < oz + b.z + b.d + 1.1 && camY < b.h + 0.7) return 2;
+      }
+    }
+  }
+  return 0;
+}
+
+var overlay = document.getElementById('overlay');
+var started = false;
+var dirty = true;
+
+var keyhelp = document.getElementById('keyhelp');
+var helpOn = false;
+function toggleHelp(force) {
+  helpOn = (force === undefined) ? !helpOn : !!force;
+  if (keyhelp) keyhelp.classList.toggle('show', helpOn);
+}
+
+function start() {
+  if (started) return;
+  started = true;
+  if (overlay) overlay.style.display = 'none';
+  dirty = true;
+  try { render(); } catch (e) { }
+}
+
+function toggleFullscreen() {
+  var el = document.documentElement;
+  var inFs = document.fullscreenElement || document.webkitFullscreenElement;
+  if (!inFs) {
+    var req = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (req) { try { req.call(el); } catch (e) { } }
+  } else {
+    var exit = document.exitFullscreen || document.webkitExitFullscreen;
+    if (exit) { try { exit.call(document); } catch (e) { } }
+  }
+}
+
+var HANDLED = { KeyW: 1, KeyA: 1, KeyS: 1, KeyD: 1, KeyZ: 1, KeyX: 1,
+  KeyR: 1, KeyH: 1, KeyP: 1, KeyC: 1, KeyF: 1, Enter: 1, NumpadEnter: 1, Tab: 1,
+  BracketLeft: 1, BracketRight: 1,
+  ArrowUp: 1, ArrowDown: 1, ArrowLeft: 1, ArrowRight: 1, Space: 1 };
+var ALIAS = { ArrowUp: 'KeyW', ArrowDown: 'KeyS', ArrowLeft: 'KeyA', ArrowRight: 'KeyD' };
+
+if (typeof window !== 'undefined' && window.addEventListener) {
+  window.addEventListener('keydown', function (e) {
+    var code = ALIAS[e.code] || e.code;
+    if (HANDLED[e.code]) e.preventDefault();
+    var wasStarted = started;
+    start();
+    if (code === 'Enter' || code === 'NumpadEnter') {
+      if (wasStarted && !e.repeat) toggleHelp();
+    } else if (code === 'KeyR') {
+      if (!e.repeat) { respawn(); dirty = true; }
+    } else if (code === 'KeyH') {
+      if (!e.repeat) { hudOn = !hudOn; dirty = true; }
+    } else if (code === 'KeyP') {
+      if (!e.repeat) { paused = !paused; mouseActive = false; mRoll = 0; mPitch = 0; dirty = true; }
+    } else if (code === 'KeyC') {
+      if (!e.repeat) { collideOn = !collideOn; crashed = 0; crashTimer = 0; dirty = true; }
+    } else if (code === 'KeyF') {
+      if (!e.repeat) toggleFullscreen();
+    } else if (code === 'BracketLeft') {
+      /* [FIX] 通过调整 colScale 来控制缩放，并保存 */
+      if (!e.repeat) { 
+        colScale = Math.max(4, colScale - 0.5); 
+        try { localStorage.setItem('asciifpv.colscale', String(colScale)); } catch(ex) {}
+        setupGrid(); dirty = true; 
+      }
+    } else if (code === 'BracketRight') {
+      if (!e.repeat) { 
+        colScale = Math.min(16, colScale + 0.5); 
+        try { localStorage.setItem('asciifpv.colscale', String(colScale)); } catch(ex) {}
+        setupGrid(); dirty = true; 
+      }
+    }
+    keys[code] = 1;
+  });
+  window.addEventListener('keyup', function (e) { keys[ALIAS[e.code] || e.code] = 0; });
+  window.addEventListener('blur', function () { keys = Object.create(null); mouseActive = false; mRoll = 0; mPitch = 0; });
+
+  var resizeTimer = 0;
+  window.addEventListener('resize', function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function () { setupGrid(); dirty = true; }, 120);
+  });
+
+  document.addEventListener('fullscreenchange', function () { setupGrid(); dirty = true; });
+
+  if (overlay) overlay.addEventListener('mousedown', function () { start(); });
+
+  canvas.addEventListener('mousedown', function (e) {
+    if (e.button === 0 && started && !paused && !crashed) {
+      mouseActive = true;
+      e.preventDefault();
+    }
+  });
+  window.addEventListener('mouseup', function (e) {
+    if (e.button === 0) { mouseActive = false; mRoll = 0; mPitch = 0; }
+  });
+  window.addEventListener('mousemove', function (e) {
+    if (!mouseActive) return;
+    var w = canvas.clientWidth || 1, h = canvas.clientHeight || 1;
+    var nx = (e.clientX / w) * 2 - 1;
+    var ny = (e.clientY / h) * 2 - 1;
+    var dz = 0.12;
+    mRoll  = Math.abs(nx) < dz ? 0 : (nx - Math.sign(nx) * dz) / (1 - dz);
+    mPitch = Math.abs(ny) < dz ? 0 : (ny - Math.sign(ny) * dz) / (1 - dz);
+  });
+  canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+}
+
+var acc = 0, last = 0, fpsT = 0, fpsN = 0;
+var STEP = 1 / 120;
+
+function frame(now) {
+  var dt = (now - last) / 1000;
+  last = now;
+  if (!(dt > 0) || dt > 0.25) dt = 0.016;
+
+  try {
+    var active = started && !paused && !crashed;
+    if (active) {
+      acc += dt;
+      if (acc > 0.12) acc = 0.12;
+      while (acc >= STEP) { physics(STEP); acc -= STEP; }
+      active = started && !paused && !crashed;
+    }
+
+    if (started && !paused && crashed) {
+      crashTimer += dt;
+      if (crashTimer > 2.5) { respawn(); dirty = true; }
+    }
+
+    if (active || dirty) { render(); dirty = false; }
+  } catch (err) {
+    if (window.console && console.error) console.error(err);
+  }
+
+  fpsN++; fpsT += dt;
+  if (fpsT > 0.5) {
+    fpsVal = Math.round(fpsN / fpsT);
+    fpsT = 0; fpsN = 0;
+    /* [FIX] 此处彻底移除了自动降低分辨率/增加字符大小的逻辑 */
+  }
+  requestAnimationFrame(frame);
+}
+
+setupGrid();
+render();
+dirty = false;
+
+if (document.fonts && document.fonts.ready && document.fonts.ready.then) {
+  document.fonts.ready.then(function () { setupGrid(); dirty = true; });
+}
+
+if (typeof requestAnimationFrame === 'function') {
+  requestAnimationFrame(function (t) { last = t; frame(t + 16); });
+}
+
+globalThis.__ASCIIFPV__ = {
+  setCam: function (o) {
+    if (o.x !== undefined) camX = o.x; if (o.y !== undefined) camY = o.y; if (o.z !== undefined) camZ = o.z;
+    if (o.yaw !== undefined) yaw = o.yaw; if (o.pitch !== undefined) pitch = o.pitch;
+    if (o.roll !== undefined) roll = o.roll; if (o.spd !== undefined) spd = o.spd;
+    updateBasis();
+  },
+  step: function (dt) { physics(dt); },
+  render: function () { render(); },
+  info: function () {
+    return { COLS: COLS, ROWS: ROWS, cellW: cellW, cellH: cellH, camX: camX, camY: camY, camZ: camZ,
+             yaw: yaw, pitch: pitch, roll: roll, spd: spd, crashed: crashed, pal: PAL.length };
+  },
+  dump: function () {
+    var out = [];
+    for (var y = 0; y < ROWS; y++) {
+      var line = '';
+      for (var x = 0; x < COLS; x++) line += String.fromCharCode(chars[y * COLS + x] || 32);
+      out.push(line.replace(/\s+$/, ''));
+    }
+    return out.join('\n');
+  }
+};
+</script>
+</body>
+</html>
