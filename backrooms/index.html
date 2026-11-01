@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#10100c">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>后室 · THE BACKROOMS</title>
+<link rel="stylesheet" href="style.css?v=20261030-fix-5">
+</head>
+<body>
+<canvas id="gl"></canvas>
+<canvas id="scare" class="hidden"></canvas>
+<div id="blink" aria-hidden="true"></div>
+
+<div id="hud" class="hidden">
+  <div id="rec"><span class="dot"></span>REC</div>
+  <div id="lvl">LEVEL 0</div>
+  <div id="clock"><div id="tc">00:00:00</div><div id="date">SEP.29 1996</div></div>
+  <div id="noclip" class="hidden"><div class="nc-lab">切出概率</div><div id="nc-val">0%</div><div class="bar"><i id="nc-bar"></i></div><div id="nc-next">下次判定 5s</div></div>
+  <div id="objective" class="hidden"></div>
+  <canvas id="minimap" class="hidden" width="200" height="200"></canvas>
+  <canvas id="radar" class="hidden" width="150" height="150"></canvas>
+  <div id="cross"></div>
+  <div id="marker"><div class="m-arrow"></div><div class="m-icon"><span>!</span></div><div id="m-dist">0m</div></div>
+  <div id="prompt"></div>
+  <div id="msgs"></div>
+  <div id="note" class="hidden"><div id="note-title"></div><div id="note-body"></div><div id="note-close">[E] 合上 · 走开也会自动合上</div></div>
+  <div id="bars">
+    <div class="bar-row" data-kind="sanity"><span class="lab">理智</span><div class="bar"><i id="b-sanity"></i></div></div>
+    <div class="bar-row" data-kind="stamina"><span class="lab">体力</span><div class="bar"><i id="b-stamina"></i></div></div>
+    <div class="bar-row" data-kind="battery"><span class="lab">电量</span><div class="bar"><i id="b-battery"></i></div></div>
+  </div>
+  <div id="inv">
+    <div class="slot"><span class="key">Q</span>杏仁水<b id="n-almond">0</b></div>
+    <div class="slot"><span class="key">R</span>电池<b id="n-battery">0</b></div>
+    <div class="slot"><span class="key">F</span>手电筒<b id="n-flash">关</b></div>
+    <div class="slot"><span class="key">T</span>荧光棒<b id="n-glow">2</b></div>
+  </div>
+  <div id="mech" class="hidden">
+    <div class="mech-top"><span id="mech-name"></span><b id="mech-val"></b></div>
+    <div class="mech-bar"><i id="mech-fill"></i></div>
+    <div id="mech-label"></div>
+  </div>
+  <div id="hunt-hud" class="hidden">
+    <div class="hh-row"><span>人类</span><b id="hh-alive">0</b><em>/ <span id="hh-total">0</span></em></div>
+    <div class="hh-row"><span>逃脱</span><b id="hh-escaped">0</b></div>
+    <div class="hh-row"><span>剩余</span><b id="hh-time">5:00</b></div>
+    <div class="hh-row"><span>声音</span><b id="hh-noise">静止</b></div>
+    <div class="hh-ab"><span>E</span><b>扑击</b><i><u id="hh-a1"></u></i></div>
+    <div class="hh-ab"><span>Q</span><b id="hh-abil">技能</b><i><u id="hh-a2"></u></i></div>
+  </div>
+  <div id="hunt-scent" class="hidden"><i id="hs-arrow">▲</i><span id="hs-text">最近的气味</span></div>
+  <div id="hunt-marks"></div>
+</div>
+
+<div id="title" class="screen">
+  <div class="title-inner">
+    <div class="tag">FOUND FOOTAGE · TAPE 03 · 1996</div>
+    <h1 class="glitch" data-text="后室">后室</h1>
+    <h2>THE BACKROOMS</h2>
+    <p class="lore">
+      如果你不小心在错误的地方切出了现实，你就会来到后室。<br>
+      这里只有陈旧潮湿的地毯的臭味，单调的黄色墙纸，以及永无止境的嗡嗡作响的荧光灯。<br>
+      大约六亿平方英里的随机分割的空房间——<br>
+      如果你听到附近有东西在走动，那它一定已经注意到你了。
+    </p>
+    <div id="loading">正在生成后室……</div>
+    <div id="menu" class="hidden">
+      <button id="btn-new" class="btn primary">生存模式 · 选择层级</button>
+      <button id="btn-hunt" class="btn">猎杀模式 · 扮演怪物</button>
+      <button id="btn-settings" class="btn">设置</button>
+    </div>
+    <div class="tip">🎧 强烈建议佩戴耳机 —— 留意每一层的提示：收音机、浪声、机器和墙上的海报，都可能是线索。</div>
+    <p class="title-device-hint"><span class="desktop-instructions">WASD 移动 · 鼠标环顾 · 操作说明见设置</span><span class="touch-instructions">左侧摇杆移动 · 右侧滑动环顾 · 推荐横屏游玩</span></p>
+  </div>
+</div>
+
+<div id="settings-screen" class="screen hidden" role="dialog" aria-modal="true" aria-labelledby="settings-heading">
+  <div class="settings-panel">
+    <header class="settings-header">
+      <div><div class="tag">TAPE CONFIGURATION</div><h3 id="settings-heading">设置</h3></div>
+      <button id="btn-settings-close" class="btn small">完成</button>
+    </header>
+    <div class="settings-grid">
+      <section class="settings-group" aria-labelledby="settings-display">
+        <h4 id="settings-display">画面与显示</h4>
+        <label class="setting-row" for="s-quality"><span>画质</span><select id="s-quality"><option value="0">流畅</option><option value="1">均衡</option><option value="2">精细</option></select></label>
+        <label class="setting-row" for="s-resolution"><span>画面清晰度</span><select id="s-resolution"><option value="auto">自适应（推荐）</option><option value="battery">省电</option><option value="sharp">高分辨率</option></select></label>
+        <p class="setting-help">自动适配 1.5K、2K 等高清屏。发热或卡顿时，可降低画质或选择省电。</p>
+        <label class="setting-range" for="s-fov"><span>视野 <output id="v-fov" for="s-fov">75°</output></span><input id="s-fov" type="range" min="60" max="100" step="1"></label>
+        <button id="btn-fullscreen" class="btn setting-fullscreen" data-fullscreen>进入全屏</button>
+        <p class="setting-help">手机全屏时会尝试横屏；也可以手动旋转设备。</p>
+      </section>
+      <section class="settings-group" aria-labelledby="settings-input">
+        <h4 id="settings-input">声音与操作</h4>
+        <label class="setting-range" for="s-vol"><span>音量 <output id="v-vol" for="s-vol">80%</output></span><input id="s-vol" type="range" min="0" max="1" step="0.05"></label>
+        <label class="setting-range" for="s-sens"><span>鼠标灵敏度 <output id="v-sens" for="s-sens">1.00</output></span><input id="s-sens" type="range" min="0.2" max="3" step="0.05"></label>
+        <label class="setting-range" for="s-touch-sens"><span>触屏灵敏度 <output id="v-touch-sens" for="s-touch-sens">1.00</output></span><input id="s-touch-sens" type="range" min="0.2" max="3" step="0.05"></label>
+        <label class="setting-row" for="s-touch"><span>触屏摇杆与按钮</span><select id="s-touch"><option value="auto">自动识别</option><option value="on">始终显示</option><option value="off">关闭（使用键鼠）</option></select></label>
+        <label class="setting-range" for="s-touch-opacity"><span>触屏按钮不透明度 <output id="v-touch-opacity" for="s-touch-opacity">75%</output></span><input id="s-touch-opacity" type="range" min="0.35" max="1" step="0.05"></label>
+      </section>
+      <section class="settings-group" aria-labelledby="settings-diff">
+        <h4 id="settings-diff">难度</h4>
+        <label class="setting-row" for="s-diff"><span>整体难度</span><select id="s-diff">
+          <option value="0">轻松 · 探索</option><option value="1">标准</option><option value="2">紧张 · 猎杀</option>
+        </select></label>
+        <p class="setting-help">影响怪物出现的时间与听觉范围；猎杀模式里还决定人类数量、他们开始找出口的时间和时限。下一层生效。</p>
+      </section>
+      <section class="settings-group" aria-labelledby="settings-assist">
+        <h4 id="settings-assist">辅助</h4>
+        <label class="setting-row" for="s-guide"><span>目标指引<small>显示前往目标的方向</small></span><input id="s-guide" type="checkbox"></label>
+        <label class="setting-row" for="s-stealth"><span>隐身模式<small>自由探索，避免被实体捕获</small></span><input id="s-stealth" type="checkbox"></label>
+      </section>
+      <section class="settings-group settings-instructions" aria-labelledby="settings-controls">
+        <h4 id="settings-controls">操作说明</h4>
+        <p>手机：左侧摇杆移动，右侧空白区域滑动环顾。疾跑、蹲伏点按切换；扫描按钮按住使用。</p>
+        <div class="controls">
+          <span><b>WASD</b>移动</span><span><b>SHIFT</b>奔跑</span><span><b>C</b>蹲伏 / 下潜</span><span><b>鼠标</b>环顾</span>
+          <span><b>F</b>手电筒</span><span><b>E</b>交互</span><span><b>Q</b>杏仁水</span><span><b>R</b>电池</span><span><b>T</b>荧光棒</span><span><b>M</b>地图</span><span><b>G</b>扫描</span><span><b>ESC</b>暂停</span>
+        </div>
+      </section>
+    </div>
+    <p class="settings-footer">设置自动保存到当前设备</p>
+  </div>
+</div>
+
+<div id="hunt-select" class="screen hidden" aria-labelledby="hunt-heading">
+  <div class="select-inner">
+    <header class="select-header">
+      <div><div class="tag">THE BACKROOMS · HUNT PROTOCOL</div><h3 id="hunt-heading">猎杀模式</h3></div>
+      <button id="btn-hunt-back" class="btn small">返回首页</button>
+    </header>
+    <p class="hunt-lore">这一次，听见脚步的是他们。<br>
+      挑一个你要扮演的东西。每张地图都有 3~5 个由 AI 操控的人类：他们会逃跑、会躲起来、会摸向出口。</p>
+    <div id="monster-grid" class="monster-grid"></div>
+    <div class="hunt-foot">
+      <div id="hunt-preview" class="hunt-preview"></div>
+      <button id="btn-hunt-next" class="btn primary">下一步 · 选择猎场</button>
+    </div>
+  </div>
+</div>
+
+<div id="level-select" class="screen hidden" aria-labelledby="select-heading">
+  <div class="select-inner">
+    <header class="select-header">
+      <div><div class="tag">THE BACKROOMS · LOCATION ARCHIVE</div><h3 id="select-heading">选择层级</h3></div>
+      <button id="btn-select-back" class="btn small">返回首页</button>
+    </header>
+    <div class="select-layout">
+      <div class="level-grid" id="level-grid" aria-label="层级列表"></div>
+      <section class="level-detail" aria-labelledby="select-title">
+        <div class="level-hero"><img id="select-image" alt=""><span id="select-image-status">正在载入场景影像……</span></div>
+        <div class="level-detail-copy">
+          <div id="select-name"></div><h4 id="select-title"></h4><div id="select-sub"></div>
+          <p id="select-desc"></p><p id="select-hint"></p>
+          <button id="btn-select-enter" class="btn primary">进入此层级</button>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<div id="card" class="screen hidden">
+  <div class="card-inner">
+    <div id="card-name">LEVEL 0</div>
+    <div id="card-title">大厅</div>
+    <div id="card-sub">The Lobby</div>
+    <p id="card-desc"></p>
+    <p id="card-hint"></p>
+    <div class="blink">— 点击任意处继续 —</div>
+  </div>
+</div>
+
+<div id="pause" class="screen hidden">
+  <div class="panel">
+    <h3>已暂停</h3>
+     <button id="btn-resume" class="btn primary">继续</button>
+    <button id="btn-pause-settings" class="btn">设置</button>
+    <button id="btn-quit" class="btn">返回标题</button>
+  </div>
+</div>
+
+<div id="dead" class="screen hidden">
+  <div class="panel">
+    <h3 id="dead-title">你死了</h3>
+    <p id="dead-text"></p>
+    <button id="btn-retry" class="btn primary">重试本层</button>
+    <button id="btn-dead-quit" class="btn">返回标题</button>
+  </div>
+</div>
+
+<div id="ending" class="screen hidden">
+  <div class="panel wide">
+    <h3>THE FRONTROOMS</h3>
+    <p id="end-text"></p>
+    <div id="end-stats"></div>
+    <button id="btn-end" class="btn primary">返回标题</button>
+  </div>
+</div>
+
+<div id="game-tools" class="hidden" aria-label="游戏菜单">
+  <button id="btn-game-fullscreen" class="tool-button" data-fullscreen aria-label="进入全屏">全屏</button>
+  <button id="btn-game-pause" class="tool-button" aria-label="暂停游戏">暂停</button>
+</div>
+
+<div id="touch-controls" class="hidden" aria-label="触屏操作">
+  <div id="look-pad" aria-label="滑动调整视角"><span class="look-hint">滑动环顾</span></div>
+  <div id="move-pad" role="group" aria-label="移动摇杆">
+    <span class="stick-label">移动</span><span id="move-stick"></span>
+  </div>
+  <div class="touch-actions">
+    <button id="touch-interact" class="touch-button touch-primary" data-action="interact">交互</button>
+    <button id="touch-flash" class="touch-button" data-action="flash" aria-pressed="false">手电</button>
+    <button id="touch-sprint" class="touch-button" data-toggle="sprint" aria-pressed="false">疾跑</button>
+    <button id="touch-crouch" class="touch-button" data-toggle="crouch" aria-pressed="false">蹲伏</button>
+    <button id="touch-map" class="touch-button" data-action="map" aria-pressed="false">地图</button>
+    <button id="touch-almond" class="touch-button touch-supply" data-action="drink">杏仁水 <b id="touch-almond-count">0</b></button>
+    <button id="touch-battery" class="touch-button touch-supply" data-action="battery">电池 <b id="touch-battery-count">1</b></button>
+    <button id="touch-scan" class="touch-button hidden" data-hold="scan">扫描</button>
+    <button id="touch-glow" class="touch-button" data-action="glow">荧光棒</button>
+    <button id="touch-lunge" class="touch-button touch-primary hunt-only" data-action="lunge">扑击</button>
+    <button id="touch-skill" class="touch-button hunt-only" data-action="ability">技能</button>
+  </div>
+  <p id="rotate-hint">横屏游玩，视野更开阔</p>
+</div>
+
+<div id="rotate-gate" role="dialog" aria-modal="true" aria-labelledby="gate-heading">
+  <div class="gate-inner">
+    <div class="gate-icon"><i></i></div>
+    <div class="tag">MOBILE · LANDSCAPE ONLY</div>
+    <h3 id="gate-heading">请横屏游玩</h3>
+    <p>
+      后室在横屏下视野更开阔，操作区也更顺手。<br>
+      请把手机横过来，或点下面的按钮自动切换全屏横屏。
+    </p>
+    <button id="gate-fullscreen" class="btn primary">全屏并锁定横屏</button>
+    <p class="gate-note">若按钮没有反应，请手动旋转设备，或在浏览器菜单里开启全屏。</p>
+  </div>
+</div>
+
+<div id="ui-toast" class="hidden" role="status" aria-live="polite"></div>
+<pre id="error" class="hidden"></pre>
+
+<script src="js/util.js"></script>
+<script src="js/textures.js?v=20261030-fix-5"></script>
+<script src="js/levels.js?v=20261030-fix-5"></script>
+<script src="js/world.js"></script>
+<script src="js/mesher.js"></script>
+<script src="js/renderer.js?v=20261030-fix-5"></script>
+<script src="js/audio.js?v=20261030-fix-5"></script>
+<script src="js/entity.js?v=20261030-fix-5"></script>
+<script src="js/level-previews.js"></script>
+<script src="js/touch-controls.js?v=20261030-fix-5"></script>
+<script src="js/game.js?v=20261030-fix-5"></script>
+</body>
+</html>
