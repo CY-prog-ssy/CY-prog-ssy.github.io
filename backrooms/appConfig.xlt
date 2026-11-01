@@ -1,0 +1,20 @@
+{
+	"appName":"后室Web",
+	"appPackageName":"top.web.houshi33",
+	"appVersionName":"1.0.1",
+	"appVersionCode":101,
+	"data":{
+		"启用顶栏":false,
+		"顶栏标题":"",
+		"顶栏颜色":"#FF2C2E43",
+		"横屏":true,
+		"显示状态栏":false,
+		"启用进度条":false,
+		"进度条颜色":"#00000000",
+		"支持打开外部应用":true,
+		"提示打开外部应用":false,
+		"启动页面":"index.html"
+	},
+	"indexPages":[],
+	"extraHeaders":{}
+}
