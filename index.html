@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Airplane · 个人主页</title>
+<meta name="description" content="Airplane 的个人主页，写代码，也写字。" />
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #ffffff;
+    --bg-soft: #f6f6f8;
+    --bg-card: #ffffff;
+    --text: #111114;
+    --text-mid: #3f3f46;
+    --text-soft: #71717a;
+    --border: #e8e8ec;
+    --border-strong: #d6d6dd;
+    --accent: #2f6feb;
+    --green: #22c55e;
+    --radius: 14px;
+    --max: 720px;
+  }
+
+  [data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0e0e10;
+    --bg-soft: #17171a;
+    --bg-card: #141417;
+    --text: #f2f2f6;
+    --text-mid: #c9c9d3;
+    --text-soft: #8f8f9c;
+    --border: #26262b;
+    --border-strong: #36363d;
+    --accent: #7aa2ff;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 84px;
+  }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    line-height: 1.75;
+    -webkit-font-smoothing: antialiased;
+    transition: background .3s ease, color .3s ease;
+    animation: fade .5s ease both;
+  }
+
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+
+  ::selection { background: var(--accent); color: #fff; }
+
+  .wrap {
+    width: 100%;
+    max-width: var(--max);
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  /* ================= 顶部导航 ================= */
+  .site-header {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .site-header .wrap {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 62px;
+  }
+
+  .logo {
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -.01em;
+    color: var(--text);
+    text-decoration: none;
+  }
+  .logo .dot { color: var(--accent); }
+
+  nav { display: flex; align-items: center; gap: 4px; }
+
+  nav a {
+    padding: 6px 10px;
+    font-size: 13.5px;
+    color: var(--text-soft);
+    text-decoration: none;
+    border-radius: 8px;
+    transition: color .2s, background .2s;
+  }
+  nav a:hover { color: var(--text); background: var(--bg-soft); }
+
+  nav a.active {
+    color: var(--text);
+    background: var(--bg-soft);
+    font-weight: 550;
+  }
+
+  .theme-btn {
+    width: 34px;
+    height: 34px;
+    margin-left: 8px;
+    display: grid;
+    place-items: center;
+    font-size: 15px;
+    line-height: 1;
+    color: var(--text);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: background .2s, transform .3s, border-color .2s;
+  }
+  .theme-btn:hover {
+    background: var(--bg-soft);
+    border-color: var(--border-strong);
+    transform: rotate(-18deg);
+  }
+
+  /* ================= 首屏 ================= */
+  main { flex: 1; }
+
+  .hero { padding: 76px 0 0; }
+
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 12px 4px 10px;
+    font-size: 12.5px;
+    color: var(--text-mid);
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+  }
+
+  .status .pulse {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, .18);
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+
+  .hero h1 {
+    margin-top: 24px;
+    font-size: clamp(34px, 7vw, 52px);
+    font-weight: 750;
+    line-height: 1.12;
+    letter-spacing: -.035em;
+  }
+  .hero h1 .dot { color: var(--accent); }
+
+  .hero .role {
+    margin-top: 14px;
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: .01em;
+    color: var(--text-mid);
+  }
+
+  .hero .desc {
+    margin-top: 26px;
+    max-width: 50ch;
+    font-size: 17px;
+    line-height: 1.8;
+    color: var(--text-soft);
+  }
+
+  .hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 34px;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 18px;
+    font-size: 14px;
+    font-weight: 550;
+    border-radius: 10px;
+    text-decoration: none;
+    transition: transform .2s, background .2s, border-color .2s, box-shadow .2s;
+  }
+
+  .btn-primary {
+    color: var(--bg);
+    background: var(--text);
+    border: 1px solid var(--text);
+  }
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px -8px rgba(0, 0, 0, .45);
+  }
+
+  .btn-ghost {
+    color: var(--text-mid);
+    background: transparent;
+    border: 1px solid var(--border-strong);
+  }
+  .btn-ghost:hover {
+    color: var(--text);
+    background: var(--bg-soft);
+    transform: translateY(-1px);
+  }
+
+  /* ================= 区块通用 ================= */
+  .section { margin-top: 78px; }
+
+  .sec-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sec-head h2 {
+    font-size: 19px;
+    font-weight: 700;
+    letter-spacing: -.015em;
+    color: var(--text);
+  }
+
+  .sec-head .num {
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: .18em;
+    color: var(--text-soft);
+    opacity: .65;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ================= 关于 ================= */
+  .about-body { padding-top: 22px; }
+
+  .about-body p {
+    font-size: 15.5px;
+    line-height: 1.85;
+    color: var(--text-soft);
+  }
+  .about-body p + p { margin-top: 16px; }
+
+  .about-body strong {
+    font-weight: 600;
+    color: var(--text-mid);
+  }
+
+  /* ================= 技能 ================= */
+  .skill-groups { padding-top: 8px; }
+
+  .skill-group {
+    display: flex;
+    gap: 20px;
+    padding: 16px 0;
+    border-bottom: 1px dashed var(--border);
+  }
+  .skill-group:last-child { border-bottom: none; }
+
+  .skill-group .cat {
+    flex: 0 0 72px;
+    padding-top: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .02em;
+    color: var(--text);
+  }
+
+  .skill-group .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .tag {
+    padding: 4px 12px;
+    font-size: 13px;
+    color: var(--text-mid);
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    transition: border-color .2s, color .2s;
+  }
+  .tag:hover {
+    color: var(--accent);
+    border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  }
+
+  /* ================= 项目 ================= */
+  .project-list { padding-top: 8px; }
+
+  .project-card {
+    display: block;
+    padding: 20px 22px;
+    margin-top: 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    text-decoration: none;
+    color: inherit;
+    transition: border-color .25s, transform .25s, box-shadow .25s;
+  }
+  .project-card:hover {
+    border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+    transform: translateY(-2px);
+    box-shadow: 0 12px 28px -18px rgba(0, 0, 0, .35);
+  }
+  .project-card:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .project-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .pt-title {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .pt-title h3 {
+    font-size: 16.5px;
+    font-weight: 650;
+    letter-spacing: -.015em;
+    color: var(--text);
+  }
+
+  .state {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 1px 9px;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--text-soft);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .state i {
+    display: block;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--green);
+  }
+
+  .project-top .go {
+    flex-shrink: 0;
+    font-size: 13px;
+    color: var(--text-soft);
+    transition: transform .2s, color .2s;
+  }
+  .project-card:hover .go {
+    color: var(--accent);
+    transform: translate(3px, -3px);
+  }
+
+  .project-card > p {
+    margin-top: 8px;
+    font-size: 14.5px;
+    line-height: 1.75;
+    color: var(--text-soft);
+  }
+
+  .project-card .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 14px;
+  }
+
+  .mini-tag {
+    padding: 2px 9px;
+    font-size: 11.5px;
+    letter-spacing: .02em;
+    color: var(--text-soft);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+
+  /* 文件夹内文件清单 */
+  .file-list {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--border);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+    color: var(--text-soft);
+  }
+  .file-list .folder {
+    color: var(--text-mid);
+    font-weight: 600;
+    margin-right: 2px;
+  }
+  .file-list .file {
+    padding: 1px 7px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: var(--bg-soft);
+  }
+
+  .more-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 22px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--accent);
+    text-decoration: none;
+    transition: gap .2s;
+  }
+  .more-link:hover { gap: 10px; }
+
+  /* ================= 最近 ================= */
+  .now-body {
+    padding: 22px 0 0 22px;
+    border-left: 2px solid var(--border);
+  }
+
+  .now-item {
+    position: relative;
+    font-size: 15.5px;
+    line-height: 1.8;
+    color: var(--text-soft);
+  }
+  .now-item + .now-item { margin-top: 16px; }
+
+  .now-item::before {
+    content: "";
+    position: absolute;
+    left: -27px;
+    top: 12px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--border-strong);
+  }
+
+  .now-item strong {
+    font-weight: 600;
+    color: var(--text-mid);
+  }
+
+  /* ================= 联系方式 ================= */
+  .contact-card {
+    margin-top: 18px;
+    padding: 6px 22px;
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  .contact-list { display: flex; flex-direction: column; }
+
+  .contact-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 15px 0;
+    border-bottom: 1px solid var(--border);
+    text-decoration: none;
+    color: inherit;
+    transition: color .2s;
+  }
+  .contact-item:last-child { border-bottom: none; }
+
+  .contact-item:hover { color: var(--accent); }
+  .contact-item:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .contact-item .key {
+    flex-shrink: 0;
+    font-size: 13.5px;
+    color: var(--text-soft);
+    transition: color .2s;
+  }
+  .contact-item:hover .key { color: var(--accent); }
+
+  .contact-item .val {
+    font-size: 14.5px;
+    font-weight: 500;
+    color: var(--text);
+    word-break: break-all;
+    text-align: right;
+    transition: color .2s;
+  }
+  .contact-item:hover .val { color: var(--accent); }
+
+  .contact-item .arrow {
+    flex-shrink: 0;
+    font-size: 13px;
+    color: var(--text-soft);
+    transition: transform .2s, color .2s;
+  }
+  .contact-item:hover .arrow {
+    transform: translate(3px, -3px);
+    color: var(--accent);
+  }
+
+  .section-end { margin-bottom: 88px; }
+
+  /* ================= 页脚 ================= */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 26px 0 40px;
+  }
+  footer .wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 13px;
+    color: var(--text-soft);
+  }
+  footer a {
+    color: var(--text-soft);
+    text-decoration: none;
+    transition: color .2s;
+  }
+  footer a:hover { color: var(--accent); }
+
+  /* ================= 移动端 ================= */
+  @media (max-width: 640px) {
+    .hero { padding-top: 52px; }
+    .hero .desc { font-size: 16px; }
+
+    nav a { padding: 6px 7px; font-size: 13px; }
+    nav a[href="#skills"],
+    nav a[href="#projects"] { display: none; }
+
+    .section { margin-top: 56px; }
+    .section-end { margin-bottom: 60px; }
+
+    .sec-head h2 { font-size: 17.5px; }
+
+    .skill-group {
+      flex-direction: column;
+      gap: 8px;
+      padding: 14px 0;
+    }
+    .skill-group .cat { padding-top: 0; }
+
+    .contact-card { padding: 4px 18px; }
+
+    .contact-item {
+      flex-wrap: wrap;
+      gap: 2px 12px;
+      padding: 14px 0;
+    }
+    .contact-item .val {
+      width: 100%;
+      text-align: left;
+      font-size: 14px;
+    }
+    .contact-item .arrow { display: none; }
+
+    .now-body { padding-left: 18px; }
+    .now-item::before { left: -23px; }
+
+    .file-list { font-size: 11.5px; }
+    .pt-title h3 { font-size: 15.5px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+    html { scroll-behavior: auto; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap">
+    <a class="logo" href="#">Airplane<span class="dot">.</span></a>
+    <nav>
+      <a href="#about">关于</a>
+      <a href="#skills">技能</a>
+      <a href="#projects">项目</a>
+      <a href="#now">近况</a>
+      <a href="#contact">联系</a>
+      <button class="theme-btn" id="themeToggle" aria-label="切换深浅色主题">🌙</button>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+
+    <!-- 首屏 -->
+    <section class="hero">
+      <span class="status">
+        <span class="pulse"></span>
+        暂不可联系
+      </span>
+
+      <h1>你好，我是<br />Airplane<span class="dot">.</span></h1>
+      <p class="role">学生 · 写代码，也写字</p>
+
+      <p class="desc">
+        我喜欢把复杂的东西拆成简单的部分，再用它们拼回一个清晰的样子。
+        这里记录我的项目、技能，和一些正在发生的事。
+      </p>
+
+      <div class="hero-actions">
+        <a class="btn btn-primary"
+           href="https://github.com/CY-prog-ssy"
+           target="_blank" rel="noopener noreferrer">
+          GitHub ↗
+        </a>
+        <a class="btn btn-ghost" href="mailto:linyun_135@qq.com">
+          发邮件
+        </a>
+        <a class="btn btn-ghost" href="#projects">
+          看项目
+        </a>
+      </div>
+    </section>
+
+    <!-- 关于 -->
+    <section class="section" id="about">
+      <div class="sec-head">
+        <h2>关于我</h2>
+        <span class="num">01 / ABOUT</span>
+      </div>
+      <div class="about-body">
+        <p>
+          我是 Airplane，一名<strong>学生</strong>。日常和浏览器、组件以及各种边界情况打交道，
+          喜欢干净、直接、有呼吸感的界面。
+        </p>
+        <p>
+          工作之外，我会写一些笔记，也偶尔跑步。
+          这个主页是用 <strong>HTML 和 CSS 手工搭建</strong>的，没有框架，没有构建工具。
+        </p>
+      </div>
+    </section>
+
+    <!-- 技能 -->
+    <section class="section" id="skills">
+      <div class="sec-head">
+        <h2>技能与工具</h2>
+        <span class="num">02 / STACK</span>
+      </div>
+      <div class="skill-groups">
+        <div class="skill-group">
+          <span class="cat">语言</span>
+          <div class="tags">
+            <span class="tag">HTML</span>
+            <span class="tag">CSS</span>
+            <span class="tag">JavaScript</span>
+            <span class="tag">Lua</span>
+          </div>
+        </div>
+        <div class="skill-group">
+          <span class="cat">框架</span>
+          <div class="tags">
+            <span class="tag">React</span>
+            <span class="tag">Vue</span>
+            <span class="tag">Node.js</span>
+          </div>
+        </div>
+        <div class="skill-group">
+          <span class="cat">工具</span>
+          <div class="tags">
+            <span class="tag">Vite</span>
+            <span class="tag">Git</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 项目 -->
+    <section class="section" id="projects">
+      <div class="sec-head">
+        <h2>项目</h2>
+        <span class="num">03 / WORKS</span>
+      </div>
+      <div class="project-list">
+
+        <!-- 后室 -->
+        <a class="project-card"
+           href="./backrooms/index.html"
+           target="_blank" rel="noopener noreferrer">
+          <div class="project-top">
+            <div class="pt-title">
+              <h3>后室 Backrooms</h3>
+              <span class="state"><i></i>可运行</span>
+            </div>
+            <span class="go" aria-hidden="true">↗</span>
+          </div>
+          <p>
+            第一人称后室探索。低多边形场景、荧光灯氛围与无尽的走廊，
+            用浏览器就能走进那个黄色的异空间。
+          </p>
+          <div class="meta">
+            <span class="mini-tag">Three.js</span>
+            <span class="mini-tag">JavaScript</span>
+            <span class="mini-tag">WebGL</span>
+          </div>
+          <div class="file-list">
+            <span class="folder">📁 backrooms/</span>
+            <span class="file">index.html</span>
+            <span class="file">等</span>
+          </div>
+        </a>
+
+        <!-- 3D 射击 -->
+        <a class="project-card"
+           href="./3d-shooter/index.html"
+           target="_blank" rel="noopener noreferrer">
+          <div class="project-top">
+            <div class="pt-title">
+              <h3>3D 射击</h3>
+              <span class="state"><i></i>可运行</span>
+            </div>
+            <span class="go" aria-hidden="true">↗</span>
+          </div>
+          <p>
+            第一人称 3D 射击 Demo。支持移动、瞄准和射击，
+            用指针锁定实现鼠标视角，纯前端运行。
+          </p>
+          <div class="meta">
+            <span class="mini-tag">Three.js</span>
+            <span class="mini-tag">JavaScript</span>
+            <span class="mini-tag">Pointer Lock</span>
+          </div>
+          <div class="file-list">
+            <span class="folder">📁 3d-shooter/</span>
+            <span class="file">index.html</span>
+            <span class="file">等</span>
+          </div>
+        </a>
+
+        <!-- ASCII FPV · 楼宇穿越 -->
+        <a class="project-card"
+           href="./ascii-fpv/index.html"
+           target="_blank" rel="noopener noreferrer">
+          <div class="project-top">
+            <div class="pt-title">
+              <h3>ASCII FPV · 楼宇穿越</h3>
+              <span class="state"><i></i>可运行</span>
+            </div>
+            <span class="go" aria-hidden="true">↗</span>
+          </div>
+          <p>
+            用字符渲染的第一人称飞行。穿梭在楼宇之间，
+            所有画面都由 ASCII 字符实时生成，复古又带点眩晕。
+          </p>
+          <div class="meta">
+            <span class="mini-tag">ASCII</span>
+            <span class="mini-tag">Canvas</span>
+            <span class="mini-tag">JavaScript</span>
+          </div>
+          <div class="file-list">
+            <span class="folder">📁 ascii-fpv/</span>
+            <span class="file">index.html</span>
+            <span class="file">等</span>
+          </div>
+        </a>
+
+        <!-- 液态玻璃五子棋 -->
+        <a class="project-card"
+           href="./liquid-glass-gomoku/index.html"
+           target="_blank" rel="noopener noreferrer">
+          <div class="project-top">
+            <div class="pt-title">
+              <h3>液态玻璃五子棋</h3>
+              <span class="state"><i></i>可运行</span>
+            </div>
+            <span class="go" aria-hidden="true">↗</span>
+          </div>
+          <p>
+            用液态玻璃质感做视觉的五子棋。半透明棋子、模糊与高光叠加，
+            在干净的对局里保留一点流动的质感。
+          </p>
+          <div class="meta">
+            <span class="mini-tag">Glassmorphism</span>
+            <span class="mini-tag">CSS</span>
+            <span class="mini-tag">JavaScript</span>
+          </div>
+          <div class="file-list">
+            <span class="folder">📁 liquid-glass-gomoku/</span>
+            <span class="file">index.html</span>
+          </div>
+        </a>
+
+      </div>
+
+      <a class="more-link"
+         href="https://github.com/CY-prog-ssy"
+         target="_blank" rel="noopener noreferrer">
+        在 GitHub 上查看更多 <span>→</span>
+      </a>
+    </section>
+
+    <!-- 最近 -->
+    <section class="section" id="now">
+      <div class="sec-head">
+        <h2>最近在做什么</h2>
+        <span class="num">04 / NOW</span>
+      </div>
+      <div class="now-body">
+        <p class="now-item">
+          最近在<strong>制作游戏</strong>，也在完善各类项目。
+          周末会花时间读一点非技术书，保持输入。
+        </p>
+        <p class="now-item">
+          思考有迹可循。
+        </p>
+      </div>
+    </section>
+
+    <!-- 联系 -->
+    <section class="section section-end" id="contact">
+      <div class="sec-head">
+        <h2>联系方式</h2>
+        <span class="num">05 / CONTACT</span>
+      </div>
+      <div class="contact-card">
+        <div class="contact-list">
+          <a class="contact-item"
+             href="https://github.com/CY-prog-ssy"
+             target="_blank" rel="noopener noreferrer">
+            <span class="key">GitHub</span>
+            <span class="val">CY-prog-ssy</span>
+            <span class="arrow" aria-hidden="true">↗</span>
+          </a>
+          <a class="contact-item" href="mailto:linyun_135@qq.com">
+            <span class="key">邮箱</span>
+            <span class="val">linyun_135@qq.com</span>
+            <span class="arrow" aria-hidden="true">↗</span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>© 2025 Airplane</p>
+    <p><a href="#">回到顶部 ↑</a></p>
+  </div>
+</footer>
+
+<script>
+  (function () {
+    /* ---------- 主题切换 ---------- */
+    var root = document.documentElement;
+    var btn = document.getElementById('themeToggle');
+
+    function getSaved() {
+      try { return localStorage.getItem('theme'); } catch (e) { return null; }
+    }
+    function save(v) {
+      try { localStorage.setItem('theme', v); } catch (e) {}
+    }
+    function render() {
+      btn.textContent = root.getAttribute('data-theme') === 'dark' ? '☀️' : '🌙';
+    }
+
+    var saved = getSaved();
+    var prefersDark = window.matchMedia &&
+      window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+    root.setAttribute('data-theme', saved || (prefersDark ? 'dark' : 'light'));
+    render();
+
+    btn.addEventListener('click', function () {
+      var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      root.setAttribute('data-theme', next);
+      save(next);
+      render();
+    });
+
+    /* ---------- 导航跟随高亮 ---------- */
+    var sections = Array.prototype.slice.call(document.querySelectorAll('section[id]'));
+    var navLinks = Array.prototype.slice.call(document.querySelectorAll('nav a[href^="#"]'));
+    var byId = {};
+    navLinks.forEach(function (a) { byId[a.getAttribute('href').slice(1)] = a; });
+
+    function clearActive() {
+      navLinks.forEach(function (a) { a.classList.remove('active'); });
+    }
+    function setActive(id) {
+      clearActive();
+      if (byId[id]) byId[id].classList.add('active');
+    }
+
+    if ('IntersectionObserver' in window) {
+      var visible = {};
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          visible[e.target.id] = e.isIntersecting;
+        });
+        for (var i = 0; i < sections.length; i++) {
+          var id = sections[i].id;
+          if (visible[id]) { setActive(id); return; }
+        }
+      }, { rootMargin: '-45% 0px -50% 0px', threshold: 0 });
+
+      sections.forEach(function (s) { io.observe(s); });
+
+      window.addEventListener('scroll', function () {
+        if (window.scrollY < 120) clearActive();
+      }, { passive: true });
+    }
+  })();
+</script>
+
+</body>
+</html>
