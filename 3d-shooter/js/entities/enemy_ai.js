@@ -1,9 +1,5 @@
 /* =========================================================================
    enemy_ai.js
-   敌人 AI —— 感官 / 状态机 / 掩体 / 兵种特效 / 射击 / 战斗调度器
-   增强：精准度 +15% · 伤害 +5% · 残血躲掩体 · 远距离保持距离
-   ★ 死亡动画：18 个独立倒地动画，按击杀武器 id 严格分池
-   ★ 闪光弹致盲：乱走 + 完全随机方向乱射，3 秒后自然恢复
    ========================================================================= */
 "use strict";
 
@@ -16,19 +12,10 @@ const _revDir = new THREE.Vector3();
 const AI_AIM_BONUS = 0.85;
 const AI_DMG_BONUS = 1.05;
 
-function _isBlind(e){
-  return typeof e.blindT === 'number' && e.blindT > 0;
-}
-
-function enemyEye(e, out){
-  return out.set(e.obj.position.x, e.obj.position.y + 1.62, e.obj.position.z);
-}
-
+function _isBlind(e){ return typeof e.blindT === 'number' && e.blindT > 0; }
+function enemyEye(e, out){ return out.set(e.obj.position.x, e.obj.position.y + 1.62 * (e.p.model.scale.y || 1), e.obj.position.z); }
 let _FOCUS = player;
-
-function playerChest(out){
-  return out.set(_FOCUS.pos.x, _FOCUS.pos.y + (_FOCUS.height || 1.6) * 0.62, _FOCUS.pos.z);
-}
+function playerChest(out){ return out.set(_FOCUS.pos.x, _FOCUS.pos.y + (_FOCUS.height || 1.6) * 0.62, _FOCUS.pos.z); }
 
 function hasLOS(e){
   enemyEye(e, _eEye);
@@ -65,10 +52,8 @@ function muzzleClear(e){
 const _altTmp = new THREE.Vector3();
 function pickAltTarget(e){
   const cands = [];
-  if (typeof drone !== 'undefined' && drone && !drone.dead)
-    cands.push({ pos: drone.obj.position, h: DRONE.h, r: DRONE.r, prio: e.maxArmor > 0 ? 0.85 : 0.22, hurt: d => damageDrone(d) });
-  if (typeof ally !== 'undefined' && ally && !ally.dead)
-    cands.push({ pos: ally.obj.position, h: 1.70, r: 0.46, prio: 0.45, hurt: d => damageAlly(d, e.obj.position) });
+  if (typeof drone !== 'undefined' && drone && !drone.dead) cands.push({ pos: drone.obj.position, h: DRONE.h, r: DRONE.r, prio: e.maxArmor > 0 ? 0.85 : 0.22, hurt: d => damageDrone(d) });
+  if (typeof ally !== 'undefined' && ally && !ally.dead) cands.push({ pos: ally.obj.position, h: 1.70, r: 0.46, prio: 0.45, hurt: d => damageAlly(d, e.obj.position) });
   if (typeof turrets !== 'undefined' && turrets.length){
     let bt = null, bd = Infinity;
     for (const t of turrets){
@@ -103,9 +88,7 @@ function pickAltTarget(e){
 }
 
 function chestPoint(out, alt){
-  return alt
-    ? out.set(alt.pos.x, alt.pos.y + alt.h * 0.62, alt.pos.z)
-    : out.set(_FOCUS.pos.x, _FOCUS.pos.y + (_FOCUS.height || 1.6) * 0.62, _FOCUS.pos.z);
+  return alt ? out.set(alt.pos.x, alt.pos.y + alt.h * 0.62, alt.pos.z) : out.set(_FOCUS.pos.x, _FOCUS.pos.y + (_FOCUS.height || 1.6) * 0.62, _FOCUS.pos.z);
 }
 
 let SNIPE_LASER = null;
@@ -216,6 +199,7 @@ function enemyShoot(e, atPoint, sprd){
   const dd = dx * dx + dz * dz;
   const baseY = alt ? alt.pos.y : _FOCUS.pos.y;
   let tHit = Infinity;
+  let isHead = false; 
 
   if (dd > 1e-6){
     const t = (px * dx + pz * dz) / dd;
@@ -224,7 +208,12 @@ function enemyShoot(e, atPoint, sprd){
       const lateral = Math.hypot(cx, cz);
       if (lateral < tgtR * 1.05){
         const y = muzzle.y + dir.y * t;
-        if (y > baseY + 0.05 && y < baseY + tgtH) tHit = t;
+        if (y > baseY + 0.05 && y < baseY + tgtH) {
+            tHit = t;
+            if (y > baseY + tgtH * 0.8) {
+                isHead = true;
+            }
+        }
       }
     }
   }
@@ -248,9 +237,11 @@ function enemyShoot(e, atPoint, sprd){
     const d0 = W.dmg ? W.dmg[0] : 5.5;
     const d1 = W.dmg ? W.dmg[1] : 9.0;
     const near = W.near || 25, far = W.far || 55;
-    const dmg = rand(d0, d1) * clamp(1 - Math.max(0, dist - near) / far, 0.35, 1) * (e.dmgMul || 1) * AI_DMG_BONUS;
+    let dmg = rand(d0, d1) * clamp(1 - Math.max(0, dist - near) / far, 0.35, 1) * (e.dmgMul || 1) * AI_DMG_BONUS;
+    if (isHead) dmg *= 1.8; 
+    
     if (alt) alt.hurt(dmg);
-    else applyDamageTo(_FOCUS, dmg, e.obj.position);
+    else applyDamageTo(_FOCUS, dmg, e.obj.position, 0, isHead);
   } else if (hits.length){
     const n = hits[0].face ? hits[0].face.normal.clone().transformDirection(hits[0].object.matrixWorld) : new THREE.Vector3(0, 1, 0);
     fxImpactWall(hits[0].point, n, hits[0].distance);
@@ -378,395 +369,54 @@ function alertToGunfire(radius){
   alertSquad(radius, 3, e => pick(['SHOTS FIRED — ' + bearingWord(e), 'CONTACT, MOVING TO SUPPORT', 'GUNFIRE, SWEEPING ' + bearingWord(e)]), 0.7);
 }
 
-/* =========================================================================
-   ★★★ 死亡动画系统 ★★★
-   每个枪械独立 3 种倒地方式，按武器 id 严格分池，绝不互串
-   ========================================================================= */
 function _eoCubic(x){ return 1 - Math.pow(1 - x, 3); }
 function _eiCubic(x){ return x * x * x; }
 
-/* -------------------------------------------------------------------------
-   【M4 步枪】3 种：向后仰倒 / 原地转倒 / 先跪后扑
-   ------------------------------------------------------------------------- */
-
-/* rifle_back —— 中口径向后仰倒，头先着地 */
-function animRifleBack(e, p, t, dt){
-  const fall = _eoCubic(clamp(t / 0.55, 0, 1));
-  const bounce = Math.sin(clamp((t - 0.55) / 0.30, 0, 1) * PI) * 0.030;
-  p.model.rotation.x = -fall * (PI * 0.46);
-  p.model.rotation.z = fall * 0.08;
-  p.model.position.y = fall * 0.06 + bounce;
+function animGunBack(e, p, t, dt){
+  const fallE = _eoCubic(clamp(t / 0.55, 0, 1));
+  const bounceK = clamp((t - 0.55) / 0.30, 0, 1);
+  const bounce = Math.sin(bounceK * Math.PI) * 0.035 * (1 - bounceK);
+  p.model.rotation.x = fallE * (PI * 0.50);
+  p.model.rotation.z = fallE * 0.14;
+  p.model.position.y = fallE * 0.08 + bounce;
   const k = _eoCubic(clamp(t / 0.50, 0, 1));
-  p.legs[0].hip.rotation.x = lerp(0, -0.35, k);
-  p.legs[1].hip.rotation.x = lerp(0, -0.22, k);
-  p.legs[0].hip.rotation.z = lerp(0, 0.16, k);
-  p.legs[1].hip.rotation.z = lerp(0, -0.16, k);
-  p.legs[0].knee.rotation.x = lerp(0, 0.55, k);
-  p.legs[1].knee.rotation.x = lerp(0, 0.42, k);
-  p.arms[0].sh.rotation.x = lerp(0.85, -0.75, k);
-  p.arms[0].sh.rotation.z = lerp(0.65, 1.20, k);
-  p.arms[0].el.rotation.x = lerp(-0.11, -0.45, k);
-  p.arms[1].sh.rotation.x = lerp(1.12, -0.85, k);
-  p.arms[1].sh.rotation.z = lerp(-0.28, -1.25, k);
-  p.arms[1].el.rotation.x = lerp(-1.39, -0.35, k);
-  p.head.rotation.x = lerp(0, -0.30, k);
-  p.head.rotation.z = lerp(0, 0.15, k);
+  p.legs[0].hip.rotation.x  = lerp(0,  0.18, k); p.legs[1].hip.rotation.x  = lerp(0, -0.28, k);
+  p.legs[0].hip.rotation.z  = lerp(0,  0.22, k); p.legs[1].hip.rotation.z  = lerp(0, -0.32, k);
+  p.legs[0].knee.rotation.x = lerp(0,  0.45, k); p.legs[1].knee.rotation.x = lerp(0,  0.70, k);
+  p.arms[0].sh.rotation.x = lerp(0.85, -0.55, k); p.arms[0].sh.rotation.z = lerp(0.65,  1.35, k); p.arms[0].el.rotation.x = lerp(-0.11, -0.30, k);
+  p.arms[1].sh.rotation.x = lerp(1.12, -0.75, k); p.arms[1].sh.rotation.z = lerp(-0.28, -1.45, k); p.arms[1].el.rotation.x = lerp(-1.39, -0.20, k);
+  p.head.rotation.x = lerp(0, -0.12, k); p.head.rotation.z = lerp(0,  0.20, k);
 }
 
-/* rifle_spin —— 被打得原地转圈后倒下 */
-function animRifleSpin(e, p, t, dt){
+function animGunForward(e, p, t, dt){
+  const fallE = _eoCubic(clamp(t / 0.55, 0, 1));
+  const bounceK = clamp((t - 0.55) / 0.30, 0, 1);
+  const bounce = Math.sin(bounceK * Math.PI) * 0.025 * (1 - bounceK);
+  p.model.rotation.x = fallE * (-PI * 0.48); p.model.rotation.z = fallE * -0.10; p.model.position.y = fallE * 0.14 + bounce;
+  const k = _eoCubic(clamp(t / 0.50, 0, 1));
+  p.legs[0].hip.rotation.x  = lerp(0, -0.48, k); p.legs[1].hip.rotation.x  = lerp(0, -0.32, k);
+  p.legs[0].hip.rotation.z  = lerp(0,  0.10, k); p.legs[1].hip.rotation.z  = lerp(0, -0.10, k);
+  p.legs[0].knee.rotation.x = lerp(0,  0.95, k); p.legs[1].knee.rotation.x = lerp(0,  1.20, k);
+  p.arms[0].sh.rotation.x = lerp(0.85, 1.55, k); p.arms[0].sh.rotation.z = lerp(0.65, 0.35, k); p.arms[0].el.rotation.x = lerp(-0.11, -0.55, k);
+  p.arms[1].sh.rotation.x = lerp(1.12, 1.60, k); p.arms[1].sh.rotation.z = lerp(-0.28, -0.42, k); p.arms[1].el.rotation.x = lerp(-1.39, -0.60, k);
+  p.head.rotation.x = lerp(0, 0.28, k); p.head.rotation.z = lerp(0, 0.35, k);
+}
+
+function animGunSide(e, p, t, dt){
   const dir = e._rollDir || 1;
-  const spinT = clamp(t / 0.45, 0, 1);
-  const fallT = clamp((t - 0.45) / 0.55, 0, 1);
-  const spinAngle = _eoCubic(spinT) * PI * 1.05 * dir;
-  const fall = _eoCubic(fallT);
-  const bounce = Math.sin(clamp((t - 0.85) / 0.30, 0, 1) * PI) * 0.028;
-  p.model.rotation.y = spinAngle;
-  p.model.rotation.z = fall * (PI * 0.48) * dir;
-  p.model.rotation.x = fall * 0.15;
-  p.model.position.y = fall * 0.06 + bounce;
-  const k = _eoCubic(clamp(t / 0.60, 0, 1));
-  p.legs[0].hip.rotation.x = lerp(0, 0.28, k);
-  p.legs[1].hip.rotation.x = lerp(0, -0.20, k);
-  p.legs[0].hip.rotation.z = lerp(0, 0.35, k);
-  p.legs[1].hip.rotation.z = lerp(0, -0.25, k);
-  p.legs[0].knee.rotation.x = lerp(0, 0.62, k);
-  p.legs[1].knee.rotation.x = lerp(0, 0.48, k);
-  p.arms[0].sh.rotation.x = lerp(0.85, 0.35, k);
-  p.arms[0].sh.rotation.z = lerp(0.65, 1.55, k);
-  p.arms[0].el.rotation.x = lerp(-0.11, -0.75, k);
-  p.arms[1].sh.rotation.x = lerp(1.12, 0.20, k);
-  p.arms[1].sh.rotation.z = lerp(-0.28, -1.65, k);
-  p.arms[1].el.rotation.x = lerp(-1.39, -0.55, k);
-  p.head.rotation.y = spinT * 0.8 * dir;
-  p.head.rotation.x = lerp(0, 0.25, k);
+  const fallE = _eoCubic(clamp(t / 0.60, 0, 1));
+  const bounceK = clamp((t - 0.60) / 0.28, 0, 1);
+  const bounce = Math.sin(bounceK * Math.PI) * 0.025 * (1 - bounceK);
+  p.model.rotation.z = fallE * (PI * 0.48) * dir; p.model.rotation.x = fallE * 0.20; p.model.position.y = fallE * 0.10 + bounce;
+  const k = _eoCubic(clamp(t / 0.50, 0, 1));
+  p.legs[0].hip.rotation.x  = lerp(0,  0.55, k); p.legs[1].hip.rotation.x  = lerp(0,  0.35, k);
+  p.legs[0].hip.rotation.z  = lerp(0,  0.30, k); p.legs[1].hip.rotation.z  = lerp(0, -0.20, k);
+  p.legs[0].knee.rotation.x = lerp(0,  0.95, k); p.legs[1].knee.rotation.x = lerp(0,  0.80, k);
+  p.arms[0].sh.rotation.x = lerp(0.85, 0.45, k); p.arms[0].sh.rotation.z = lerp(0.65, 0.95, k); p.arms[0].el.rotation.x = lerp(-0.11, -0.70, k);
+  p.arms[1].sh.rotation.x = lerp(1.12, 0.30, k); p.arms[1].sh.rotation.z = lerp(-0.28, -0.60, k); p.arms[1].el.rotation.x = lerp(-1.39, -0.90, k);
+  p.head.rotation.x = lerp(0, 0.15, k); p.head.rotation.z = lerp(0, -0.30 * dir, k);
 }
 
-/* rifle_kneel —— 膝盖先软，跪地 0.35s，再向前扑 */
-function animRifleKneel(e, p, t, dt){
-  const kneel = _eoCubic(clamp(t / 0.35, 0, 1));
-  const fallT = clamp((t - 0.35) / 0.50, 0, 1);
-  const fall = _eoCubic(fallT);
-  const bounce = Math.sin(clamp((t - 0.80) / 0.25, 0, 1) * PI) * 0.025;
-  p.model.position.y = -kneel * 0.35 + fall * 0.42 + bounce;
-  p.model.rotation.x = -fall * (PI * 0.42);
-  p.model.rotation.z = fall * 0.12;
-  const k = _eoCubic(clamp(t / 0.55, 0, 1));
-  p.legs[0].hip.rotation.x = lerp(0, 0.95, kneel);
-  p.legs[1].hip.rotation.x = lerp(0, 0.85, kneel);
-  p.legs[0].hip.rotation.z = lerp(0, 0.18, kneel);
-  p.legs[1].hip.rotation.z = lerp(0, -0.18, kneel);
-  p.legs[0].knee.rotation.x = lerp(0, 1.55, kneel);
-  p.legs[1].knee.rotation.x = lerp(0, 1.45, kneel);
-  p.arms[0].sh.rotation.x = lerp(0.85, 1.20, k);
-  p.arms[0].sh.rotation.z = lerp(0.65, 0.55, k);
-  p.arms[0].el.rotation.x = lerp(-0.11, -0.90, k);
-  p.arms[1].sh.rotation.x = lerp(1.12, 1.35, k);
-  p.arms[1].sh.rotation.z = lerp(-0.28, -0.45, k);
-  p.arms[1].el.rotation.x = lerp(-1.39, -1.05, k);
-  p.head.rotation.x = lerp(0, 0.35, kneel);
-  p.head.rotation.z = lerp(0, 0.15, k);
-}
-
-/* -------------------------------------------------------------------------
-   【KS-12 霰弹枪】3 种：被轰飞 / 上身后折后倒 / 推撞墙滑落
-   ------------------------------------------------------------------------- */
-
-/* shotgun_blast —— 被轰飞出去，空中翻滚，落地弹两下 */
-function animShotgunBlast(e, p, t, dt){
-  const dir = e._rollDir || 1;
-  if (!e._blastVel){
-    e._blastVel = new THREE.Vector3(
-      (Math.random() - 0.5) * 2, rand(2.5, 4.0), -dir * rand(4, 6)
-    );
-    e._blastAV = new THREE.Vector3(rand(-6, 6), rand(-3, 3), rand(-5, 5) * dir);
-  }
-  e._blastVel.y -= 24 * dt;
-  p.model.position.x += e._blastVel.x * dt;
-  p.model.position.y += e._blastVel.y * dt;
-  p.model.position.z += e._blastVel.z * dt;
-  p.model.rotation.x += e._blastAV.x * dt;
-  p.model.rotation.y += e._blastAV.y * dt;
-  p.model.rotation.z += e._blastAV.z * dt;
-  if (p.model.position.y <= 0.10 && e._blastVel.y < 0){
-    p.model.position.y = 0.10;
-    if (Math.abs(e._blastVel.y) < 1.5){
-      e._blastVel = null; e._blastAV = null;
-      p.model.rotation.x = PI * 0.5; p.model.rotation.y = 0; p.model.rotation.z = rand(-0.3, 0.3);
-    } else {
-      e._blastVel.y *= -0.30; e._blastVel.x *= 0.5; e._blastVel.z *= 0.5; e._blastAV.multiplyScalar(0.5);
-    }
-  }
-  const k = _eoCubic(clamp(t / 0.40, 0, 1));
-  p.legs[0].hip.rotation.x = lerp(0, -0.55, k);
-  p.legs[1].hip.rotation.x = lerp(0, 0.30, k);
-  p.legs[0].hip.rotation.z = lerp(0, 0.42, k);
-  p.legs[1].hip.rotation.z = lerp(0, -0.38, k);
-  p.legs[0].knee.rotation.x = lerp(0, 0.75, k);
-  p.legs[1].knee.rotation.x = lerp(0, 0.65, k);
-  p.arms[0].sh.rotation.x = lerp(0.85, -0.85, k);
-  p.arms[0].sh.rotation.z = lerp(0.65, 1.55, k);
-  p.arms[0].el.rotation.x = lerp(-0.11, -0.20, k);
-  p.arms[1].sh.rotation.x = lerp(1.12, -0.95, k);
-  p.arms[1].sh.rotation.z = lerp(-0.28, -1.65, k);
-  p.arms[1].el.rotation.x = lerp(-1.39, -0.15, k);
-  p.head.rotation.x = lerp(0, -0.45, k);
-}
-
-/* shotgun_double —— 上身后折，然后整个人向后倒，平躺 */
-function animShotgunDouble(e, p, t, dt){
-  const bend = _eoCubic(clamp(t / 0.30, 0, 1));
-  const fall = _eoCubic(clamp((t - 0.30) / 0.55, 0, 1));
-  const bounce = Math.sin(clamp((t - 0.85) / 0.30, 0, 1) * PI) * 0.022;
-  p.body.rotation.x = -bend * 0.55;
-  p.body.position.y = bend * 0.15;
-  p.model.rotation.x = -fall * (PI * 0.44);
-  p.model.position.y = fall * 0.08 + bounce;
-  p.model.rotation.z = fall * 0.10;
-  const k = _eoCubic(clamp(t / 0.60, 0, 1));
-  p.legs[0].hip.rotation.x = lerp(0, -0.28, k);
-  p.legs[1].hip.rotation.x = lerp(0, -0.22, k);
-  p.legs[0].hip.rotation.z = lerp(0, 0.22, k);
-  p.legs[1].hip.rotation.z = lerp(0, -0.18, k);
-  p.legs[0].knee.rotation.x = lerp(0, 0.42, k);
-  p.legs[1].knee.rotation.x = lerp(0, 0.35, k);
-  p.arms[0].sh.rotation.x = lerp(0.85, 1.35, k);
-  p.arms[0].sh.rotation.z = lerp(0.65, 0.85, k);
-  p.arms[0].el.rotation.x = lerp(-0.11, -0.55, k);
-  p.arms[1].sh.rotation.x = lerp(1.12, 1.55, k);
-  p.arms[1].sh.rotation.z = lerp(-0.28, -0.85, k);
-  p.arms[1].el.rotation.x = lerp(-1.39, -0.65, k);
-  p.head.rotation.x = lerp(0, -0.55, k);
-}
-
-/* shotgun_wall —— 被推向后方的墙，撞墙后滑落 */
-function animShotgunWall(e, p, t, dt){
-  if (!e._blastVel){
-    e._blastVel = new THREE.Vector3(0, rand(1.5, 2.5), rand(2.5, 4.0));
-    e._blastAV = new THREE.Vector3(rand(-3, 3), 0, rand(-2, 2));
-  }
-  e._blastVel.y -= 22 * dt;
-  p.model.position.y += e._blastVel.y * dt;
-  p.model.position.z += e._blastVel.z * dt;
-  p.model.position.x += e._blastVel.x * dt;
-  p.model.rotation.x += e._blastAV.x * dt;
-  p.model.rotation.y += e._blastAV.y * dt;
-  p.model.rotation.z += e._blastAV.z * dt;
-  if (p.model.position.y <= 0.10 && e._blastVel.y < 0){
-    p.model.position.y = 0.10;
-    e._blastVel.y = 0;
-    e._blastVel.z *= 0.6;
-  }
-  if (t > 1.2 && e._blastVel){
-    e._blastVel = null;
-    p.model.rotation.x = PI * 0.5;
-  }
-  const k = _eoCubic(clamp(t / 0.40, 0, 1));
-  p.legs[0].hip.rotation.x = lerp(0, -0.20, k);
-  p.legs[1].hip.rotation.x = lerp(0, 0.15, k);
-  p.legs[0].hip.rotation.z = lerp(0, 0.20, k);
-  p.legs[1].hip.rotation.z = lerp(0, -0.20, k);
-  p.legs[0].knee.rotation.x = lerp(0, 0.30, k);
-  p.legs[1].knee.rotation.x = lerp(0, 0.25, k);
-  p.arms[0].sh.rotation.x = lerp(0.85, 1.20, k);
-  p.arms[0].sh.rotation.z = lerp(0.65, 1.40, k);
-  p.arms[0].el.rotation.x = lerp(-0.11, -0.35, k);
-  p.arms[1].sh.rotation.x = lerp(1.12, 1.45, k);
-  p.arms[1].sh.rotation.z = lerp(-0.28, -1.55, k);
-  p.arms[1].el.rotation.x = lerp(-1.39, -0.25, k);
-  p.head.rotation.x = lerp(0, -0.30, k);
-}
-
-/* -------------------------------------------------------------------------
-   【P-9 手枪】3 种：头偏软倒 / 踉跄后退 / 拧转侧倒
-   ------------------------------------------------------------------------- */
-
-/* pistol_snap —— 头猛地一偏，身体软倒 */
-function animPistolSnap(e, p, t, dt){
-  const snap = _eoCubic(clamp(t / 0.18, 0, 1));
-  const fall = _eoCubic(clamp((t - 0.18) / 0.65, 0, 1));
-  const bounce = Math.sin(clamp((t - 0.83) / 0.25, 0, 1) * PI) * 0.018;
-  p.head.rotation.z = snap * 0.65;
-  p.head.rotation.y = snap * 0.30;
-  p.head.rotation.x = lerp(0, 0.25, snap);
-  p.model.rotation.x = -fall * (PI * 0.35);
-  p.model.rotation.z = fall * 0.20;
-  p.model.position.y = fall * 0.05 + bounce;
-  const k = _eoCubic(clamp(t / 0.55, 0, 1));
-  p.body.rotation.z = -fall * 0.20;
-  p.legs[0].hip.rotation.x = lerp(0, 0.30, k);
-  p.legs[1].hip.rotation.x = lerp(0, 0.22, k);
-  p.legs[0].hip.rotation.z = lerp(0, 0.18, k);
-  p.legs[1].hip.rotation.z = lerp(0, -0.15, k);
-  p.legs[0].knee.rotation.x = lerp(0, 0.55, k);
-  p.legs[1].knee.rotation.x = lerp(0, 0.48, k);
-  p.arms[0].sh.rotation.x = lerp(0.85, 1.10, k);
-  p.arms[0].sh.rotation.z = lerp(0.65, 0.95, k);
-  p.arms[0].el.rotation.x = lerp(-0.11, -0.45, k);
-  p.arms[1].sh.rotation.x = lerp(1.12, 1.30, k);
-  p.arms[1].sh.rotation.z = lerp(-0.28, -0.85, k);
-  p.arms[1].el.rotation.x = lerp(-1.39, -0.55, k);
-}
-
-/* pistol_stumble —— 踉跄后退几步后倒 */
-function animPistolStumble(e, p, t, dt){
-  if (!e._stumbleVel){
-    e._stumbleVel = new THREE.Vector3((Math.random() - 0.5) * 1.0, 0, rand(1.5, 2.5));
-  }
-  if (t < 0.5){
-    const stumbleFactor = Math.sin(clamp(t / 0.5, 0, 1) * PI);
-    p.model.position.x += e._stumbleVel.x * stumbleFactor * dt;
-    p.model.position.z += e._stumbleVel.z * stumbleFactor * dt;
-    p.model.rotation.z = Math.sin(t * 15) * 0.10 * stumbleFactor;
-    p.model.rotation.x = -Math.sin(t * 12) * 0.08 * stumbleFactor;
-  }
-  if (t >= 0.5){
-    const fall = _eoCubic(clamp((t - 0.5) / 0.55, 0, 1));
-    const bounce = Math.sin(clamp((t - 1.05) / 0.25, 0, 1) * PI) * 0.020;
-    p.model.rotation.x = -fall * (PI * 0.40);
-    p.model.rotation.z = fall * 0.08;
-    p.model.position.y = fall * 0.06 + bounce;
-  }
-  const k = _eoCubic(clamp(t / 0.55, 0, 1));
-  p.legs[0].hip.rotation.x = lerp(0, 0.15, k);
-  p.legs[1].hip.rotation.x = lerp(0, 0.30, k);
-  p.legs[0].hip.rotation.z = lerp(0, 0.12, k);
-  p.legs[1].hip.rotation.z = lerp(0, -0.12, k);
-  p.legs[0].knee.rotation.x = lerp(0, 0.40, k);
-  p.legs[1].knee.rotation.x = lerp(0, 0.55, k);
-  p.arms[0].sh.rotation.x = lerp(0.85, 0.55, k);
-  p.arms[0].sh.rotation.z = lerp(0.65, 1.10, k);
-  p.arms[0].el.rotation.x = lerp(-0.11, -0.30, k);
-  p.arms[1].sh.rotation.x = lerp(1.12, 0.85, k);
-  p.arms[1].sh.rotation.z = lerp(-0.28, -1.15, k);
-  p.arms[1].el.rotation.x = lerp(-1.39, -0.40, k);
-  p.head.rotation.z = lerp(0, 0.25, k);
-}
-
-/* pistol_twist —— 身体拧转，侧倒 */
-function animPistolTwist(e, p, t, dt){
-  const dir = e._rollDir || 1;
-  const twist = _eoCubic(clamp(t / 0.30, 0, 1));
-  const fall = _eoCubic(clamp((t - 0.30) / 0.60, 0, 1));
-  const bounce = Math.sin(clamp((t - 0.85) / 0.28, 0, 1) * PI) * 0.020;
-  p.model.rotation.y = twist * 0.65 * dir;
-  p.model.rotation.z = fall * (PI * 0.42) * dir;
-  p.model.rotation.x = fall * 0.20;
-  p.model.position.y = fall * 0.05 + bounce;
-  const k = _eoCubic(clamp(t / 0.55, 0, 1));
-  p.body.rotation.y = twist * 0.30 * dir;
-  p.legs[0].hip.rotation.x = lerp(0, 0.20, k);
-  p.legs[1].hip.rotation.x = lerp(0, -0.15, k);
-  p.legs[0].hip.rotation.z = lerp(0, 0.22, k);
-  p.legs[1].hip.rotation.z = lerp(0, -0.18, k);
-  p.legs[0].knee.rotation.x = lerp(0, 0.45, k);
-  p.legs[1].knee.rotation.x = lerp(0, 0.32, k);
-  p.arms[0].sh.rotation.x = lerp(0.85, 0.65, k);
-  p.arms[0].sh.rotation.z = lerp(0.65, 0.95, k);
-  p.arms[0].el.rotation.x = lerp(-0.11, -0.35, k);
-  p.arms[1].sh.rotation.x = lerp(1.12, 0.85, k);
-  p.arms[1].sh.rotation.z = lerp(-0.28, -0.85, k);
-  p.arms[1].el.rotation.x = lerp(-1.39, -0.40, k);
-  p.head.rotation.y = twist * 0.40 * dir;
-}
-
-/* -------------------------------------------------------------------------
-   【SR-7 狙击枪】3 种：被抬起 / 剧烈旋转 / 从腰部折断
-   ------------------------------------------------------------------------- */
-
-/* sniper_lift —— 被穿透力抬起，双脚离地，向后飞 */
-function animSniperLift(e, p, t, dt){
-  if (!e._liftVel){
-    e._liftVel = new THREE.Vector3(0, rand(4.0, 5.5), rand(1.5, 2.5));
-    e._liftAV = new THREE.Vector3(rand(-4, 4), 0, rand(-3, 3));
-  }
-  e._liftVel.y -= 20 * dt;
-  p.model.position.y += e._liftVel.y * dt;
-  p.model.position.z += e._liftVel.z * dt;
-  p.model.rotation.x += e._liftAV.x * dt;
-  p.model.rotation.z += e._liftAV.z * dt;
-  if (p.model.position.y <= 0.10 && e._liftVel.y < 0){
-    p.model.position.y = 0.10;
-    if (Math.abs(e._liftVel.y) < 1.5){
-      e._liftVel = null; e._liftAV = null;
-      p.model.rotation.x = PI * 0.5; p.model.rotation.y = 0; p.model.rotation.z = rand(-0.3, 0.3);
-    } else {
-      e._liftVel.y *= -0.25; e._liftVel.z *= 0.4; e._liftAV.multiplyScalar(0.4);
-    }
-  }
-  const k = _eoCubic(clamp(t / 0.35, 0, 1));
-  p.legs[0].hip.rotation.x = lerp(0, -0.40, k);
-  p.legs[1].hip.rotation.x = lerp(0, -0.30, k);
-  p.legs[0].knee.rotation.x = lerp(0, 0.55, k);
-  p.legs[1].knee.rotation.x = lerp(0, 0.45, k);
-  p.arms[0].sh.rotation.x = lerp(0.85, 0.10, k);
-  p.arms[0].sh.rotation.z = lerp(0.65, 1.45, k);
-  p.arms[0].el.rotation.x = lerp(-0.11, -0.25, k);
-  p.arms[1].sh.rotation.x = lerp(1.12, 0.05, k);
-  p.arms[1].sh.rotation.z = lerp(-0.28, -1.55, k);
-  p.arms[1].el.rotation.x = lerp(-1.39, -0.20, k);
-  p.head.rotation.x = lerp(0, -0.55, k);
-}
-
-/* sniper_spin —— 被穿透力带着剧烈旋转，慢慢倒下 */
-function animSniperSpin(e, p, t, dt){
-  const dir = e._rollDir || 1;
-  if (!e._spinT){ e._spinT = 0; e._spinDir = Math.random() < 0.5 ? 1 : -1; }
-  e._spinT += dt;
-  const spinDecay = Math.exp(-t * 2.0);
-  const spinAngle = e._spinT * 12 * spinDecay * e._spinDir;
-  const fall = _eoCubic(clamp((t - 0.35) / 0.60, 0, 1));
-  p.model.rotation.y = spinAngle;
-  p.model.rotation.x = fall * (PI * 0.42);
-  p.model.rotation.z = fall * 0.15 * dir;
-  p.model.position.y = fall * 0.08;
-  const k = _eoCubic(clamp(t / 0.55, 0, 1));
-  p.legs[0].hip.rotation.x = lerp(0, 0.35, k);
-  p.legs[1].hip.rotation.x = lerp(0, -0.30, k);
-  p.legs[0].hip.rotation.z = lerp(0, 0.30, k);
-  p.legs[1].hip.rotation.z = lerp(0, -0.25, k);
-  p.legs[0].knee.rotation.x = lerp(0, 0.65, k);
-  p.legs[1].knee.rotation.x = lerp(0, 0.50, k);
-  p.arms[0].sh.rotation.x = lerp(0.85, 0.20, k);
-  p.arms[0].sh.rotation.z = lerp(0.65, 1.65, k);
-  p.arms[0].el.rotation.x = lerp(-0.11, -0.65, k);
-  p.arms[1].sh.rotation.x = lerp(1.12, 0.10, k);
-  p.arms[1].sh.rotation.z = lerp(-0.28, -1.75, k);
-  p.arms[1].el.rotation.x = lerp(-1.39, -0.55, k);
-  p.head.rotation.x = lerp(0, 0.30, k);
-}
-
-/* sniper_buckle —— 从腰部折断，上身前折后倒 */
-function animSniperBuckle(e, p, t, dt){
-  const buckle = _eoCubic(clamp(t / 0.20, 0, 1));
-  const fold = _eoCubic(clamp((t - 0.20) / 0.60, 0, 1));
-  const bounce = Math.sin(clamp((t - 0.80) / 0.30, 0, 1) * PI) * 0.020;
-  p.body.rotation.x = buckle * 0.85;
-  p.body.position.y = -buckle * 0.35;
-  p.model.rotation.x = -fold * (PI * 0.40);
-  p.model.position.y = fold * 0.10 + bounce;
-  const k = _eoCubic(clamp(t / 0.55, 0, 1));
-  p.legs[0].hip.rotation.x = lerp(0, 0.75, buckle);
-  p.legs[1].hip.rotation.x = lerp(0, 0.65, buckle);
-  p.legs[0].knee.rotation.x = lerp(0, 1.20, buckle);
-  p.legs[1].knee.rotation.x = lerp(0, 1.10, buckle);
-  p.legs[0].hip.rotation.z = lerp(0, 0.15, k);
-  p.legs[1].hip.rotation.z = lerp(0, -0.15, k);
-  p.arms[0].sh.rotation.x = lerp(0.85, 1.55, k);
-  p.arms[0].sh.rotation.z = lerp(0.65, 0.65, k);
-  p.arms[0].el.rotation.x = lerp(-0.11, -1.20, k);
-  p.arms[1].sh.rotation.x = lerp(1.12, 1.65, k);
-  p.arms[1].sh.rotation.z = lerp(-0.28, -0.75, k);
-  p.arms[1].el.rotation.x = lerp(-1.39, -1.30, k);
-  p.head.rotation.x = lerp(0, 0.75, k);
-  p.head.rotation.z = lerp(0, 0.20, k);
-}
-
-/* -------------------------------------------------------------------------
-   【手雷】3 种：被炸飞 / 被震趴 / 炸成碎片
-   ------------------------------------------------------------------------- */
-
-/* grenade_launch —— 被炸飞，空中抛物，落地弹跳 */
 function animGrenadeLaunch(e, p, t, dt){
   if (!e._launchVel){
     const bx = (e._blastFrom ? (e.obj.position.x - e._blastFrom.x) : rand(-1, 1));
@@ -776,213 +426,66 @@ function animGrenadeLaunch(e, p, t, dt){
     e._launchVel = new THREE.Vector3(nx * speed + rand(-1.5, 1.5), rand(5, 8), nz * speed + rand(-1.5, 1.5));
     e._launchAV = new THREE.Vector3(rand(-9, 9), rand(-9, 9), rand(-9, 9));
   }
-  e._launchVel.y -= 22 * dt;
-  p.model.position.x += e._launchVel.x * dt;
-  p.model.position.y += e._launchVel.y * dt;
-  p.model.position.z += e._launchVel.z * dt;
-  p.model.rotation.x += e._launchAV.x * dt;
-  p.model.rotation.y += e._launchAV.y * dt;
-  p.model.rotation.z += e._launchAV.z * dt;
-  if (p.model.position.y <= 0.10 && e._launchVel.y < 0){
-    p.model.position.y = 0.10;
-    if (Math.abs(e._launchVel.y) < 1.6){
-      e._launchVel = null; e._launchAV = null;
-      p.model.rotation.x = PI * 0.5; p.model.rotation.y = 0; p.model.rotation.z = rand(-0.35, 0.35);
-    } else {
-      e._launchVel.y *= -0.32; e._launchVel.x *= 0.55; e._launchVel.z *= 0.55; e._launchAV.multiplyScalar(0.5);
+  if (e._launchVel){
+    e._launchVel.y -= 22 * dt;
+    p.model.position.x += e._launchVel.x * dt; p.model.position.y += e._launchVel.y * dt; p.model.position.z += e._launchVel.z * dt;
+    p.model.rotation.x += e._launchAV.x * dt; p.model.rotation.y += e._launchAV.y * dt; p.model.rotation.z += e._launchAV.z * dt;
+    if (p.model.position.y <= 0.10 && e._launchVel.y < 0){
+      p.model.position.y = 0.10;
+      if (Math.abs(e._launchVel.y) < 1.6){ e._launchVel = null; e._launchAV = null; p.model.rotation.x = PI * 0.5; p.model.rotation.y = 0; p.model.rotation.z = rand(-0.35, 0.35); }
+      else { e._launchVel.y *= -0.32; e._launchVel.x *= 0.55; e._launchVel.z *= 0.55; e._launchAV.multiplyScalar(0.5); }
     }
   }
   const k = _eoCubic(clamp(t / 0.50, 0, 1));
-  p.legs[0].hip.rotation.x = lerp(0, -0.55, k);
-  p.legs[1].hip.rotation.x = lerp(0, 0.35, k);
-  p.legs[0].hip.rotation.z = lerp(0, 0.45, k);
-  p.legs[1].hip.rotation.z = lerp(0, -0.40, k);
-  p.legs[0].knee.rotation.x = lerp(0, 0.60, k);
-  p.legs[1].knee.rotation.x = lerp(0, 0.85, k);
-  p.arms[0].sh.rotation.x = lerp(0.85, 0.25, k);
-  p.arms[0].sh.rotation.z = lerp(0.65, 1.45, k);
-  p.arms[0].el.rotation.x = lerp(-0.11, -0.35, k);
-  p.arms[1].sh.rotation.x = lerp(1.12, 0.40, k);
-  p.arms[1].sh.rotation.z = lerp(-0.28, -1.35, k);
-  p.arms[1].el.rotation.x = lerp(-1.39, -0.40, k);
+  p.legs[0].hip.rotation.x  = lerp(0, -0.55, k); p.legs[1].hip.rotation.x  = lerp(0,  0.35, k);
+  p.legs[0].hip.rotation.z  = lerp(0,  0.45, k); p.legs[1].hip.rotation.z  = lerp(0, -0.40, k);
+  p.legs[0].knee.rotation.x = lerp(0,  0.60, k); p.legs[1].knee.rotation.x = lerp(0,  0.85, k);
+  p.arms[0].sh.rotation.x = lerp(0.85, 0.25, k); p.arms[0].sh.rotation.z = lerp(0.65, 1.45, k); p.arms[0].el.rotation.x = lerp(-0.11, -0.35, k);
+  p.arms[1].sh.rotation.x = lerp(1.12, 0.40, k); p.arms[1].sh.rotation.z = lerp(-0.28, -1.35, k); p.arms[1].el.rotation.x = lerp(-1.39, -0.40, k);
 }
 
-/* grenade_slam —— 被冲击波震得原地趴下 */
 function animGrenadeSlam(e, p, t, dt){
-  const fall = _eiCubic(clamp(t / 0.35, 0, 1));
-  const settle = _eoCubic(clamp((t - 0.35) / 0.45, 0, 1));
-  const twitch = Math.sin(t * 30) * 0.05 * Math.max(0, 1 - t * 2);
-  p.model.rotation.x = -fall * (PI * 0.48) + settle * 0.15;
-  p.model.rotation.z = fall * 0.05;
-  p.model.position.y = -fall * 0.15 + settle * 0.18;
-  const k = _eoCubic(clamp(t / 0.45, 0, 1));
-  p.legs[0].hip.rotation.x = lerp(0, -0.25, k);
-  p.legs[1].hip.rotation.x = lerp(0, 0.45, k);
-  p.legs[0].hip.rotation.z = lerp(0, 0.30, k);
-  p.legs[1].hip.rotation.z = lerp(0, -0.25, k);
-  p.legs[0].knee.rotation.x = lerp(0, 0.85, k) + twitch;
-  p.legs[1].knee.rotation.x = lerp(0, 1.05, k) - twitch;
-  p.arms[0].sh.rotation.x = lerp(0.85, 0.15, k) + twitch;
-  p.arms[0].sh.rotation.z = lerp(0.65, 1.25, k);
-  p.arms[0].el.rotation.x = lerp(-0.11, -0.40, k);
-  p.arms[1].sh.rotation.x = lerp(1.12, 0.35, k) - twitch;
-  p.arms[1].sh.rotation.z = lerp(-0.28, -1.15, k);
-  p.arms[1].el.rotation.x = lerp(-1.39, -0.55, k);
+  const fallE = _eiCubic(clamp(t / 0.35, 0, 1)); const settleE = _eoCubic(clamp((t - 0.35) / 0.45, 0, 1));
+  p.model.rotation.x = -fallE * (PI * 0.48) + settleE * 0.15; p.model.rotation.z = fallE * 0.05; p.model.position.y = -fallE * 0.15 + settleE * 0.18;
+  const k = _eoCubic(clamp(t / 0.45, 0, 1)); const twitch = Math.sin(t * 30) * 0.05 * Math.max(0, 1 - t * 2);
+  p.legs[0].hip.rotation.x  = lerp(0, -0.25, k); p.legs[1].hip.rotation.x  = lerp(0,  0.45, k);
+  p.legs[0].hip.rotation.z  = lerp(0,  0.30, k); p.legs[1].hip.rotation.z  = lerp(0, -0.25, k);
+  p.legs[0].knee.rotation.x = lerp(0,  0.85, k) + twitch; p.legs[1].knee.rotation.x = lerp(0,  1.05, k) - twitch;
+  p.arms[0].sh.rotation.x = lerp(0.85, 0.15, k) + twitch; p.arms[0].sh.rotation.z = lerp(0.65, 1.25, k); p.arms[0].el.rotation.x = lerp(-0.11, -0.40, k);
+  p.arms[1].sh.rotation.x = lerp(1.12, 0.35, k) - twitch; p.arms[1].sh.rotation.z = lerp(-0.28, -1.15, k); p.arms[1].el.rotation.x = lerp(-1.39, -0.55, k);
   p.head.rotation.x = lerp(0, -0.25, k);
 }
 
-/* grenade_vaporize —— 被炸成碎片，快速消散 */
-function animGrenadeVaporize(e, p, t, dt){
-  if (!e._vapVel){
-    e._vapVel = new THREE.Vector3((Math.random() - 0.5) * 6, rand(3, 7), (Math.random() - 0.5) * 6);
-    e._vapAV = new THREE.Vector3(rand(-15, 15), rand(-15, 15), rand(-15, 15));
-  }
-  e._vapVel.y -= 25 * dt;
-  p.model.position.x += e._vapVel.x * dt;
-  p.model.position.y += e._vapVel.y * dt;
-  p.model.position.z += e._vapVel.z * dt;
-  p.model.rotation.x += e._vapAV.x * dt;
-  p.model.rotation.y += e._vapAV.y * dt;
-  p.model.rotation.z += e._vapAV.z * dt;
-  const shrink = clamp(t / 0.6, 0, 1);
-  e._vapScale = 1 - _eiCubic(shrink) * 0.85;
-  p.model.scale.setScalar(Math.max(0.15, e._vapScale));
-  const k = _eoCubic(clamp(t / 0.15, 0, 1));
-  p.legs[0].hip.rotation.x = lerp(0, -0.85, k);
-  p.legs[1].hip.rotation.x = lerp(0, 0.85, k);
-  p.legs[0].hip.rotation.z = lerp(0, 0.75, k);
-  p.legs[1].hip.rotation.z = lerp(0, -0.75, k);
-  p.legs[0].knee.rotation.x = lerp(0, 1.40, k);
-  p.legs[1].knee.rotation.x = lerp(0, 1.40, k);
-  p.arms[0].sh.rotation.x = lerp(0.85, -1.30, k);
-  p.arms[0].sh.rotation.z = lerp(0.65, 1.90, k);
-  p.arms[0].el.rotation.x = lerp(-0.11, -0.15, k);
-  p.arms[1].sh.rotation.x = lerp(1.12, -1.30, k);
-  p.arms[1].sh.rotation.z = lerp(-0.28, -1.90, k);
-  p.arms[1].el.rotation.x = lerp(-1.39, -0.15, k);
-  p.head.rotation.x = lerp(0, -0.65, k);
-  p.head.rotation.z = lerp(0, 0.45, k);
-}
-
-/* -------------------------------------------------------------------------
-   【火焰】3 种：燃烧乱舞 / 跪地塌陷 / 站直尖叫后焦黑倒下
-   ------------------------------------------------------------------------- */
-
-/* fire_panic —— 燃烧乱舞 */
 function animFirePanic(e, p, t, dt){
   const dir = e._rollDir || 1;
-  const struggleT = clamp(t / 0.40, 0, 1);
-  const fall = _eoCubic(clamp((t - 0.35) / 0.50, 0, 1));
+  const struggleT = clamp(t / 0.40, 0, 1); const fallE = _eoCubic(clamp((t - 0.35) / 0.50, 0, 1));
   const shake = Math.sin(t * 35) * 0.15 * (1 - struggleT);
-  p.model.rotation.z = shake * (1 - fall) + fall * (PI * 0.48) * dir;
-  p.model.rotation.x = fall * 0.25;
-  p.model.position.y = fall * 0.08;
+  p.model.rotation.z = shake * (1 - fallE) + fallE * (PI * 0.48) * dir; p.model.rotation.x = fallE * 0.25; p.model.position.y = fallE * 0.08;
   const k = _eoCubic(clamp(t / 0.55, 0, 1));
-  p.legs[0].hip.rotation.x = lerp(0, 0.35, k);
-  p.legs[1].hip.rotation.x = lerp(0, -0.15, k);
-  p.legs[0].hip.rotation.z = lerp(0, 0.25, k);
-  p.legs[1].hip.rotation.z = lerp(0, -0.20, k);
-  p.legs[0].knee.rotation.x = lerp(0, 0.70, k);
-  p.legs[1].knee.rotation.x = lerp(0, 0.55, k);
+  p.legs[0].hip.rotation.x  = lerp(0,  0.35, k); p.legs[1].hip.rotation.x  = lerp(0, -0.15, k);
+  p.legs[0].hip.rotation.z  = lerp(0,  0.25, k); p.legs[1].hip.rotation.z  = lerp(0, -0.20, k);
+  p.legs[0].knee.rotation.x = lerp(0,  0.70, k); p.legs[1].knee.rotation.x = lerp(0,  0.55, k);
   const armShake = Math.sin(t * 28) * 0.25 * (1 - struggleT);
-  p.arms[0].sh.rotation.x = lerp(0.85, 1.55, k) + armShake;
-  p.arms[0].sh.rotation.z = lerp(0.65, 1.05, k);
-  p.arms[0].el.rotation.x = lerp(-0.11, -0.85, k) - armShake;
-  p.arms[1].sh.rotation.x = lerp(1.12, 1.35, k) - armShake;
-  p.arms[1].sh.rotation.z = lerp(-0.28, -1.05, k);
-  p.arms[1].el.rotation.x = lerp(-1.39, -0.75, k) + armShake;
-  p.head.rotation.x = lerp(0, 0.30, k);
-  p.head.rotation.z = shake * 0.5 * (1 - fall);
+  p.arms[0].sh.rotation.x = lerp(0.85, 1.55, k) + armShake; p.arms[0].sh.rotation.z = lerp(0.65, 1.05, k); p.arms[0].el.rotation.x = lerp(-0.11, -0.85, k) - armShake;
+  p.arms[1].sh.rotation.x = lerp(1.12, 1.35, k) - armShake; p.arms[1].sh.rotation.z = lerp(-0.28, -1.05, k); p.arms[1].el.rotation.x = lerp(-1.39, -0.75, k) + armShake;
+  p.head.rotation.x = lerp(0, 0.30, k); p.head.rotation.z = shake * 0.5 * (1 - fallE);
 }
 
-/* fire_collapse —— 跪地塌陷 */
 function animFireCollapse(e, p, t, dt){
   const dir = e._rollDir || 1;
-  const kneel = _eoCubic(clamp(t / 0.30, 0, 1));
-  const fall = _eoCubic(clamp((t - 0.30) / 0.45, 0, 1));
-  p.model.position.y = -kneel * 0.35 + fall * 0.38;
-  p.model.rotation.x = -fall * (PI * 0.45);
-  p.model.rotation.z = fall * 0.15 * dir;
+  const kneelE = _eoCubic(clamp(t / 0.30, 0, 1)); const fallE  = _eoCubic(clamp((t - 0.30) / 0.45, 0, 1));
+  p.model.position.y = -kneelE * 0.35 + fallE * 0.38; p.model.rotation.x = -fallE * (PI * 0.45); p.model.rotation.z = fallE * 0.15 * dir;
   const k = _eoCubic(clamp(t / 0.60, 0, 1));
-  p.legs[0].hip.rotation.x = lerp(0, 0.95, kneel);
-  p.legs[1].hip.rotation.x = lerp(0, 0.85, kneel);
-  p.legs[0].hip.rotation.z = lerp(0, 0.15, kneel);
-  p.legs[1].hip.rotation.z = lerp(0, -0.15, kneel);
-  p.legs[0].knee.rotation.x = lerp(0, 1.55, kneel);
-  p.legs[1].knee.rotation.x = lerp(0, 1.45, kneel);
-  p.arms[0].sh.rotation.x = lerp(0.85, 1.45, k);
-  p.arms[0].sh.rotation.z = lerp(0.65, 0.55, k);
-  p.arms[0].el.rotation.x = lerp(-0.11, -0.65, k);
-  p.arms[1].sh.rotation.x = lerp(1.12, 1.55, k);
-  p.arms[1].sh.rotation.z = lerp(-0.28, -0.60, k);
-  p.arms[1].el.rotation.x = lerp(-1.39, -0.70, k);
+  p.legs[0].hip.rotation.x  = lerp(0, 0.95, kneelE); p.legs[1].hip.rotation.x  = lerp(0, 0.85, kneelE);
+  p.legs[0].hip.rotation.z  = lerp(0, 0.15, kneelE); p.legs[1].hip.rotation.z  = lerp(0, -0.15, kneelE);
+  p.legs[0].knee.rotation.x = lerp(0, 1.55, kneelE); p.legs[1].knee.rotation.x = lerp(0, 1.45, kneelE);
+  p.arms[0].sh.rotation.x = lerp(0.85, 1.45, k); p.arms[0].sh.rotation.z = lerp(0.65, 0.55, k); p.arms[0].el.rotation.x = lerp(-0.11, -0.65, k);
+  p.arms[1].sh.rotation.x = lerp(1.12, 1.55, k); p.arms[1].sh.rotation.z = lerp(-0.28, -0.60, k); p.arms[1].el.rotation.x = lerp(-1.39, -0.70, k);
   p.head.rotation.x = lerp(0, 0.45, k);
 }
 
-/* fire_scream —— 站直尖叫，双臂向上，抖动，然后焦黑倒下 */
-function animFireScream(e, p, t, dt){
-  const dir = e._rollDir || 1;
-  const scream = _eoCubic(clamp(t / 0.30, 0, 1));
-  const fall = _eoCubic(clamp((t - 0.30) / 0.55, 0, 1));
-  const shiver = Math.sin(t * 45) * 0.10 * (1 - fall);
-  p.body.rotation.x = -scream * 0.10 + shiver * 0.5;
-  p.body.position.y = scream * 0.05;
-  p.model.rotation.x = -fall * (PI * 0.42);
-  p.model.rotation.z = fall * 0.18 * dir;
-  p.model.position.y = fall * 0.06 + Math.sin(clamp((t - 0.85) / 0.25, 0, 1) * PI) * 0.018;
-  const k = _eoCubic(clamp(t / 0.55, 0, 1));
-  p.arms[0].sh.rotation.x = lerp(0.85, -0.85 + shiver * 2, scream);
-  p.arms[0].sh.rotation.z = lerp(0.65, 1.60, scream);
-  p.arms[0].el.rotation.x = lerp(-0.11, -0.15, scream);
-  p.arms[1].sh.rotation.x = lerp(1.12, -0.85 + shiver * 2, scream);
-  p.arms[1].sh.rotation.z = lerp(-0.28, -1.60, scream);
-  p.arms[1].el.rotation.x = lerp(-1.39, -0.15, scream);
-  p.legs[0].hip.rotation.x = lerp(0, 0.25, k);
-  p.legs[1].hip.rotation.x = lerp(0, -0.20, k);
-  p.legs[0].hip.rotation.z = lerp(0, 0.20, k);
-  p.legs[1].hip.rotation.z = lerp(0, -0.18, k);
-  p.legs[0].knee.rotation.x = lerp(0, 0.45, k);
-  p.legs[1].knee.rotation.x = lerp(0, 0.35, k);
-  p.head.rotation.x = lerp(0, -0.55, scream);
-  p.head.rotation.z = lerp(0, 0.20 + shiver, scream);
-}
-
-/* -------------------------------------------------------------------------
-   动画注册表 + 死亡池
-   每个池 3 个独立动画，按武器 id 严格索引，绝不互相串用。
-   ------------------------------------------------------------------------- */
-const DEATH_ANIM = {
-  rifle_back:      animRifleBack,
-  rifle_spin:      animRifleSpin,
-  rifle_kneel:     animRifleKneel,
-  shotgun_blast:   animShotgunBlast,
-  shotgun_double:  animShotgunDouble,
-  shotgun_wall:    animShotgunWall,
-  pistol_snap:     animPistolSnap,
-  pistol_stumble:  animPistolStumble,
-  pistol_twist:    animPistolTwist,
-  sniper_lift:     animSniperLift,
-  sniper_spin:     animSniperSpin,
-  sniper_buckle:   animSniperBuckle,
-  grenade_launch:  animGrenadeLaunch,
-  grenade_slam:    animGrenadeSlam,
-  grenade_vaporize: animGrenadeVaporize,
-  fire_panic:      animFirePanic,
-  fire_collapse:   animFireCollapse,
-  fire_scream:     animFireScream
-};
-
-/* ★ 每种武器独立 3 池。ally / turret 用步枪池（它们的武器本质就是步枪） */
-const DEATH_POOLS = {
-  rifle:   ['rifle_back',     'rifle_spin',     'rifle_kneel'],
-  shotgun: ['shotgun_blast',  'shotgun_double', 'shotgun_wall'],
-  pistol:  ['pistol_snap',    'pistol_stumble', 'pistol_twist'],
-  sniper:  ['sniper_lift',    'sniper_spin',    'sniper_buckle'],
-  grenade: ['grenade_launch', 'grenade_slam',   'grenade_vaporize'],
-  fire:    ['fire_panic',     'fire_collapse',  'fire_scream'],
-  ally:    ['rifle_back',     'rifle_spin',     'rifle_kneel'],
-  turret:  ['rifle_back',     'rifle_spin',     'rifle_kneel']
-};
+const DEATH_ANIM = { gun_back: animGunBack, gun_forward: animGunForward, gun_side: animGunSide, grenade_launch: animGrenadeLaunch, grenade_slam: animGrenadeSlam, fire_panic: animFirePanic, fire_collapse: animFireCollapse };
+const DEATH_POOLS = { gun: ['gun_back', 'gun_forward', 'gun_side'], grenade: ['grenade_launch', 'grenade_slam'], fire: ['fire_panic', 'fire_collapse'] };
 
 function damageEnemy(e, dmg, head, dir, point, byAlly, killer, source){
   if (!head && e.armor > 0){
@@ -993,6 +496,17 @@ function damageEnemy(e, dmg, head, dir, point, byAlly, killer, source){
   e.hp -= dmg; e.regenCd = E_REGEN_DELAY; e.flinch = Math.min(1, e.flinch + (head ? 0.9 : 0.55));
   e.alerted = true; e.lastSeen = 0;
   if (e.state === ST.PATROL){ e.state = ST.ALERT; e.reactT = rand(0.14, 0.30); }
+  
+  // ★ 新增：受击战术身法（闪避与跳枪）
+  if (!head && Math.random() < 0.35 && e.state === ST.COMBAT && e.onGround) {
+    e.evadeT = 0.45;
+    e.evadeDir = Math.random() < 0.5 ? 1 : -1;
+    if (Math.random() < 0.15) {
+      e.jumpV = rand(4.0, 6.0); // 跳枪起跳速度
+      e.onGround = false;
+    }
+  }
+
   if (e.hp <= 0){ killEnemy(e, head, dir, byAlly, killer, source); return true; }
   e.tagHp = e.hp; e.tag.draw(e.hp, true, e.armor, e.maxArmor);
   return false;
@@ -1002,36 +516,26 @@ function killEnemy(e, head, dir, byAlly, killer, source){
   if (e.dead) return;
   e.dead = true; e.hp = 0; e.state = ST.DEAD;
   e.deathTime = 0; e.deathT = 0;
-
-  /* ★ 按武器 id 选池；未知 → 步枪池（最中性） */
-  const pool = DEATH_POOLS[source] || DEATH_POOLS.rifle;
+  const pool = DEATH_POOLS[source] || DEATH_POOLS.gun;
   e.deathAnim = pool[(Math.random() * pool.length) | 0];
   e._rollDir  = Math.random() < 0.5 ? 1 : -1;
-
-  /* 清空所有可能从上一局继承的物理状态 */
-  e._launchVel = null; e._launchAV = null;
-  e._blastVel  = null; e._blastAV  = null;
-  e._liftVel   = null; e._liftAV   = null;
-  e._stumbleVel = null;
-  e._spinT = 0; e._spinDir = 1;
-  e._vapVel = null; e._vapAV = null; e._vapScale = 1;
-
-  if (source === 'grenade' && dir){
-    e._blastFrom = { x: e.obj.position.x - dir.x * 0.8, z: e.obj.position.z - dir.z * 0.8 };
-  } else {
-    e._blastFrom = null;
+  e._launchVel = null; e._launchAV  = null;
+  if (source === 'grenade' && dir){ e._blastFrom = { x: e.obj.position.x - dir.x * 0.8, z: e.obj.position.z - dir.z * 0.8 }; }
+  else { e._blastFrom = null; }
+  
+  // ★ 修复：死亡时立即重置姿态，防止趴下时死变成诡异形状
+  if (e.p && e.p.model){ 
+    e.p.model.position.set(0, 0, 0); 
+    e.p.model.rotation.set(0, 0, 0); 
+    e.p.model.scale.set(1, 1, 1); 
   }
-  if (e.p && e.p.model){
-    e.p.model.position.set(0, 0, 0);
-    e.p.model.rotation.set(0, 0, 0);
-    e.p.model.scale.set(1, 1, 1);       // ★ 清空 grenade_vaporize 的缩小
-  }
+  
   if (e.laserOn) sniperLaser(e, false);
   e.chargeT = 0; e.flameT = 0;
   e.tag.sprite.visible = false;
   rebuildHitMeshes();
   G.kills++; if (head) G.headshots++;
-  if (typeof killFeed === 'function') killFeed(e.name, head, byAlly);
+  if (typeof killFeed === 'function') killFeed(e.name, head, byAlly, source);
   G.streak = G.streakT > 0 ? G.streak + 1 : 1; G.streakT = 4.0;
   SFX.killChime(G.streak);
   if (G.streak >= 2){
@@ -1039,7 +543,7 @@ function killEnemy(e, head, dir, byAlly, killer, source){
     if (typeof pushComms === 'function') pushComms('COMMAND', words[Math.min(G.streak, 5)] + ' ×' + G.streak);
   }
   const fxKind = e.tier === TIER.BOSS ? 'boss' : e.tier === TIER.ELITE ? 'elite' : (head ? 'head' : 'kill');
-  if (typeof killFeedback === 'function') killFeedback(fxKind, byAlly, G.streak);
+  if (typeof killFeedback === 'function') killFeedback(fxKind, byAlly, G.streak, source);
   if (G.streak >= 2 && typeof showStreakBanner === 'function') showStreakBanner(G.streak);
   if (e.tier === TIER.BOSS && SFX.bossDown) SFX.bossDown();
   SFX.enemyDeath(clamp((e.obj.position.x - camera.position.x) / 14, -1, 1), e.obj.position.distanceTo(camera.position));
@@ -1056,9 +560,6 @@ function killEnemy(e, head, dir, byAlly, killer, source){
   if (alive === 0 && typeof startIntermission === 'function') startIntermission();
 }
 
-/* =========================================================================
-   每帧更新 —— 致盲时乱走 + 完全随机方向乱射
-   ========================================================================= */
 function updateEnemy(e, dt){
   const obj = e.obj, p = e.p;
   _FOCUS = player;
@@ -1071,11 +572,9 @@ function updateEnemy(e, dt){
     if (Math.abs(e.hp - e.tagHp) > e.maxHp / 60){ e.tagHp = e.hp; e.tag.draw(e.hp, e.state !== ST.PATROL, e.armor, e.maxArmor); }
   }
 
-  /* death */
   if (e.dead){
     e.deathTime += dt; e.deathT = clamp(e.deathTime / 0.80, 0, 1);
-    /* ★ 默认 fallback 改为步枪池中第一个 */
-    const animFn = DEATH_ANIM[e.deathAnim] || animRifleBack;
+    const animFn = DEATH_ANIM[e.deathAnim] || animGunBack;
     animFn(e, p, e.deathTime, dt);
     if (!e.gunDropped && e.deathTime > 0.14){
       e.gunDropped = true; scene.attach(p.gun);
@@ -1095,9 +594,48 @@ function updateEnemy(e, dt){
     return;
   }
 
+  // ★ 新增：AI 战术姿态（站立 / 蹲下 / 趴下）
+  if (e.stanceT === undefined) { e.stance = 'stand'; e.stanceT = 2.0; e.evadeT = 0; e.jumpV = undefined; }
+  
+  if (e.state === ST.COMBAT && e.canSee) {
+    e.stanceT -= dt;
+    if (e.stanceT <= 0) {
+      const r = Math.random();
+      if (r < 0.55) e.stance = 'stand';
+      else if (r < 0.85) e.stance = 'crouch'; // 35% 概率蹲下对枪
+      else e.stance = 'prone';                // 10% 概率趴下架枪
+      e.stanceT = rand(2.0, 4.0);
+    }
+  } else if (e.state !== ST.COMBAT) {
+    e.stance = 'stand';
+  }
+
+  // 平滑处理模型姿态的形变
+  let targetScaleY = 1.0;
+  if (e.stance === 'crouch') targetScaleY = 0.62;
+  if (e.stance === 'prone') targetScaleY = 0.35;
+  
+  // 对模型 Y 轴进行缩放，命中盒也会同步缩小/变矮
+  p.model.scale.y = damp(p.model.scale.y, targetScaleY, 12, dt);
+  
+  // 趴下时让模型向前倾倒，配合 Y 轴缩放形成趴地效果
+  const targetRotX = (e.stance === 'prone') ? Math.PI / 2 - 0.15 : 0;
+  p.model.rotation.x = damp(p.model.rotation.x, targetRotX, 12, dt);
+
+  // 姿态影响移动速度
+  let stanceSpeedMult = 1.0;
+  if (e.stance === 'crouch') stanceSpeedMult = 0.55;
+  else if (e.stance === 'prone') stanceSpeedMult = 0.15;
+
   e.losTimer -= dt;
   if (e.losTimer <= 0){
     e.losTimer = 0.13 + Math.random() * 0.06;
+    
+    // 开启极限优化：远处的敌人降低测视线的频率
+    if (SET && SET.extremeOptimize && e.obj.position.distanceToSquared(camera.position) > 400) {
+      e.losTimer *= 3.0;
+    }
+    
     const see = hasLOS(e);
     if (see && !e.canSee && e.state === ST.PATROL && !_isBlind(e)){
       e.state = ST.ALERT; e.reactT = rand(0.30, 0.80); e.alerted = true; e.tag.draw(e.hp, true);
@@ -1128,7 +666,13 @@ function updateEnemy(e, dt){
   }
   else if (e.state === ST.COMBAT){
     const W = e.wep || EWEAP.rifle;
-    const spd = e.spdMul || 1;
+    const spd = (e.spdMul || 1) * stanceSpeedMult; // ★ 应用姿态减速
+
+    // ★ 新增：随机战术起跳（跳枪）
+    if (e.onGround && Math.random() < 0.005 && e.canSee && !_isBlind(e)) {
+      e.jumpV = rand(4.0, 5.5);
+      e.onGround = false;
+    }
 
     if (_isBlind(e)){
       e.targetYaw += rand(-6, 6) * dt;
@@ -1146,10 +690,7 @@ function updateEnemy(e, dt){
         e.fireT = rand(0.55, 1.10);
         const wildAngle = Math.random() * PI * 2;
         const wildDist = rand(8, 25);
-        const wildPoint = {
-          x: obj.position.x + Math.sin(wildAngle) * wildDist,
-          z: obj.position.z + Math.cos(wildAngle) * wildDist
-        };
+        const wildPoint = { x: obj.position.x + Math.sin(wildAngle) * wildDist, z: obj.position.z + Math.cos(wildAngle) * wildDist };
         enemyPullTrigger(e, wildPoint);
         e.rounds -= (W.pellets || 1);
         if (e.rounds <= 0){ e.reloadT = rand(2.5, 4.5); e.rounds = 30; }
@@ -1171,8 +712,6 @@ function updateEnemy(e, dt){
         if (wounded){ e.tactic = 'hold'; } else { e.tactic = roll < 0.42 ? 'hold' : (roll < 0.72 ? 'flank' : 'push'); }
         e.cover = null;
         if (wounded && Math.random() < 0.35){ comms(e, pick(['TAKING FIRE — FALLING BACK', 'HIT — NEED COVER', 'WOUNDED, PULLING BACK']), true); }
-        if (e.tactic === 'flank' && !wasFlank && Math.random() < 0.55) comms(e, pick(['FLANKING ' + (e.strafeDir > 0 ? 'RIGHT' : 'LEFT'), 'MOVING WIDE', 'GOING AROUND, PIN HIM']));
-        if (e.tactic === 'push' && Math.random() < 0.35) comms(e, pick(['PUSHING UP', 'CLOSING IN', 'ON HIM']));
       }
 
       if (W.ideal > 20) e.tactic = 'hold';
@@ -1186,7 +725,14 @@ function updateEnemy(e, dt){
         const fwd  = new THREE.Vector3(toP.x, 0, toP.z).normalize();
         const side = new THREE.Vector3(-fwd.z, 0, fwd.x).multiplyScalar(e.strafeDir);
 
-        if (e.tactic === 'hold' || e.reloadT > 0){
+        // ★ 插入受击身法闪避逻辑
+        if (e.evadeT > 0) {
+          e.evadeT -= dt;
+          desiredX = side.x;
+          desiredZ = side.z;
+          moveSpeed = 7.0 * stanceSpeedMult; // 爆发式侧跳
+        } 
+        else if (e.tactic === 'hold' || e.reloadT > 0){
           if (!e.cover) e.cover = pickCover(e, _ePos.x, _ePos.z);
           if (e.cover && !W.charge){
             const cdx = e.cover.x - obj.position.x, cdz = e.cover.z - obj.position.z;
@@ -1215,7 +761,7 @@ function updateEnemy(e, dt){
             e.flameT += dt; e.burnT = (e.burnT || 0) + dt;
             if (e.burnT >= 0.2){ const dmg = W.dps * e.burnT * (e.dmgMul || 1) * AI_DMG_BONUS; e.burnT = 0; applyDamageTo(_FOCUS, dmg, e.obj.position, W.pierce || 0); }
             flameJet(e, dt, distToP); e.rounds -= dt * 8;
-            if (e.rounds <= 0){ e.reloadT = 2.6; e.rounds = 60; e.flameT = 0; if (Math.random() < 0.5) comms(e, pick(['TANK OUT', 'REFUELLING'])); }
+            if (e.rounds <= 0){ e.reloadT = 2.6; e.rounds = 60; e.flameT = 0; }
           } else { e.flameT = Math.max(0, e.flameT - dt * 3); e.burnT = 0; }
           if (e.reloadT > 0) e.reloadT -= dt;
           e.burst = 0;
@@ -1224,11 +770,10 @@ function updateEnemy(e, dt){
           if (e.slamCd > 0) e.slamCd -= dt;
           if (e.slamT > 0){
             e.slamT -= dt;
-            if (Math.random() < dt * 22) spawnParticle(PS_SOFT, obj.position.x + rand(-2, 2), obj.position.y + 0.2, obj.position.z + rand(-2, 2), 0, rand(0.2, 0.7), 0, { color: [0.75, 0.62, 0.42], size: 0.09, life: 0.5, drag: 2.2, grav: -1.5, alpha: .5 });
             if (e.slamT <= 0){
               slamShock(e, W);
               const dSlam = Math.hypot(_FOCUS.pos.x - obj.position.x, _FOCUS.pos.z - obj.position.z);
-              if (dSlam < W.radius && Math.abs(_FOCUS.pos.y - obj.position.y) < 2.5){ applyDamageTo(_FOCUS, rand(W.dmg[0], W.dmg[1]) * (e.dmgMul || 1) * AI_DMG_BONUS, e.obj.position, 0.35); if (_FOCUS.shake !== undefined) _FOCUS.shake = Math.min(1.8, _FOCUS.shake + 0.9); }
+              if (dSlam < W.radius && Math.abs(_FOCUS.pos.y - obj.position.y) < 2.5){ applyDamageTo(_FOCUS, rand(W.dmg[0], W.dmg[1]) * (e.dmgMul || 1) * AI_DMG_BONUS, e.obj.position, 0.35); }
               e.slamCd = rand(W.rest[0], W.rest[1]); e.fireT = e.slamCd;
             }
           } else if (e.fireT <= 0 && e.slamCd <= 0 && distToP < 6.5){ e.slamT = W.windup; SFX.magIn(); comms(e, pick(['BRACE', 'GET BACK', 'GROUND POUND']), true); }
@@ -1242,10 +787,10 @@ function updateEnemy(e, dt){
             e.burst--; e.rounds--; enemyPullTrigger(e);
             const g = W.gap && W.gap[1] ? rand(W.gap[0], W.gap[1]) : 0.12; e.fireT = g;
             if (e.burst === 0) e.fireT = rand(W.rest[0], W.rest[1]);
-            if (e.rounds <= 0){ e.burst = 0; e.reloadT = rand(W.reload[0], W.reload[1]); e.cover = null; if (Math.random() < 0.6) comms(e, pick(['RELOADING — COVER ME', 'MAG OUT', 'CHANGING MAGS'])); }
+            if (e.rounds <= 0){ e.burst = 0; e.reloadT = rand(W.reload[0], W.reload[1]); e.cover = null; }
           } else if (e.mayFire){
             if (muzzleClear(e)){
-              if (W.charge){ e.chargeT = W.charge; sniperLaser(e, true); SFX.hitBeep(false); if (e.tier === TIER.BOSS) comms(e, 'MARKSMAN — TRACKING', true); }
+              if (W.charge){ e.chargeT = W.charge; sniperLaser(e, true); SFX.hitBeep(false); }
               else { e.burst = randI(W.burst[0], W.burst[1]); e.fireT = 0.03; }
             } else { e.fireT = 0.3; e.cover = null; e.tacticT = 0; }
           } else { e.fireT = 0.25; }
@@ -1263,7 +808,6 @@ function updateEnemy(e, dt){
           if (e.rounds <= 0){ e.reloadT = rand(2.0, 2.9); e.suppress = 0; }
         } else if (e.fireT <= 0 && e.lastSeen < 2.2 && Math.random() < 0.02){ e.suppress = randI(2, 4); }
         e.burst = 0;
-        if (e.lastSeen > 2.4 && !e.saidLost){ e.saidLost = true; if (Math.random() < 0.5) comms(e, pick(['LOST VISUAL', 'WHERE IS HE', 'HE BROKE CONTACT'])); }
         if (e.lastSeen > 4.5 && e.hunt <= 0) e.state = ST.PATROL;
       }
       if (e.canSee) e.saidLost = false;
@@ -1282,7 +826,7 @@ function updateEnemy(e, dt){
 
   if (moveSpeed > 0){
     const px = obj.position.x, pz = obj.position.z;
-    const y0 = obj.position.y + 0.30, y1 = obj.position.y + 1.65;
+    const y0 = obj.position.y + 0.30, y1 = obj.position.y + 1.65 * (p.model.scale.y || 1);
     const clearAt = (nx, nz, len) => !blocked(px + nx * 0.55, pz + nz * 0.55, y0, y1, 0.46) && !blocked(px + nx * len,  pz + nz * len,  y0, y1, 0.50);
     e.repathT -= dt;
     if (e.repathT <= 0){
@@ -1322,7 +866,7 @@ function updateEnemy(e, dt){
   e.speed = damp(e.speed, sp, 10, dt);
 
   {
-    const y0 = obj.position.y + 0.30, y1 = obj.position.y + 1.65;
+    const y0 = obj.position.y + 0.30, y1 = obj.position.y + 1.65 * (p.model.scale.y || 1);
     if (blocked(obj.position.x, obj.position.z, y0, y1, 0.42)){
       depenetrate(obj.position, 0.42, y0, y1);
       if (blocked(obj.position.x, obj.position.z, y0, y1, 0.42)){
@@ -1346,9 +890,24 @@ function updateEnemy(e, dt){
     e.stuckT = 0; e.stuckX = obj.position.x; e.stuckZ = obj.position.z;
   }
 
-  const gy = groundAt(obj.position.x, obj.position.z, obj.position.y + 0.75);
-  if (gy !== null){ if (obj.position.y > gy + 0.05) obj.position.y = Math.max(gy, obj.position.y - 12 * dt); else obj.position.y = gy; }
-  else obj.position.y = Math.max(0, obj.position.y - 12 * dt);
+  // ★ 自定义跳跃与重力物理
+  if (e.jumpV !== undefined && e.jumpV > -20) {
+    e.jumpV -= 25 * dt;
+    obj.position.y += e.jumpV * dt;
+    const gy = groundAt(obj.position.x, obj.position.z, obj.position.y + 0.75);
+    if (gy !== null && obj.position.y <= gy + 0.05) {
+       obj.position.y = gy;
+       e.jumpV = undefined;
+       e.onGround = true;
+    }
+  } else {
+    const gy = groundAt(obj.position.x, obj.position.z, obj.position.y + 0.75);
+    if (gy !== null){ 
+      if (obj.position.y > gy + 0.05) obj.position.y = Math.max(gy, obj.position.y - 12 * dt); 
+      else obj.position.y = gy; 
+    }
+    else obj.position.y = Math.max(0, obj.position.y - 12 * dt);
+  }
 
   let dy = e.targetYaw - e.yaw;
   while (dy >  PI) dy -= PI * 2;
@@ -1371,10 +930,12 @@ function updateEnemy(e, dt){
   e.combatBlend = damp(e.combatBlend === undefined ? 0 : e.combatBlend, combat, 7, dt);
   const cb = e.combatBlend;
 
-  p.arms[0].sh.rotation.x = lerp(0.85 + s1 * 0.25 * walk, 1.50, cb);
+  // 如果处于趴下状态，手臂保持架枪姿势
+  const armLift = (e.stance === 'prone') ? -0.5 : 0;
+  p.arms[0].sh.rotation.x = lerp(0.85 + s1 * 0.25 * walk, 1.50 + armLift, cb);
   p.arms[0].sh.rotation.z = lerp(0.65, 0.62, cb);
   p.arms[0].el.rotation.x = lerp(-0.11, -0.15, cb);
-  p.arms[1].sh.rotation.x = lerp(1.12 - s1 * 0.25 * walk, 1.99, cb);
+  p.arms[1].sh.rotation.x = lerp(1.12 - s1 * 0.25 * walk, 1.99 + armLift, cb);
   p.arms[1].sh.rotation.z = lerp(-0.28, -0.68, cb);
   p.arms[1].el.rotation.x = lerp(-1.39, -1.69, cb);
   p.gun.position.set(lerp(0.14, 0.10, cb), lerp(-0.30, -0.05, cb), lerp(-0.20, -0.26, cb));
@@ -1383,13 +944,13 @@ function updateEnemy(e, dt){
   p.head.rotation.x = lerp(0, e.aimPitch * 0.5, cb);
 
   p.model.position.z = e.flinch * 0.14;
-  p.model.rotation.x = e.flinch * 0.20;
+  if (e.stance !== 'prone') p.model.rotation.x = e.flinch * 0.20; // 趴下时不覆盖摔倒的前倾
 
   const dCam = obj.position.distanceTo(camera.position);
   e.tag.sprite.visible = G.started && dCam < 46;
   if (e.tag.sprite.visible){
     const s = clamp(dCam * 0.055, 0.85, 2.4) * (camera.fov / BASE_FOV);
     e.tag.sprite.scale.set(1.55 * s, 0.46 * s, 1);
-    e.tag.sprite.position.y = 2.16;
+    e.tag.sprite.position.y = 2.16 * (p.model.scale.y || 1); // 血条跟着姿态升降
   }
 }

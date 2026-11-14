@@ -1,21 +1,5 @@
 /* =========================================================================
    audio.js
-   程序化 Web Audio 合成 + ./sound/ 采样文件回退
-
-   ★ 预渲染枪声（2025 最终方案）
-     问题：一个 rifle 枪声 = 6 层 × 3 节点 = 18 个 AudioNode。
-           人机交战时玩家 + 几十个敌人同帧开火，瞬间打满移动端
-           32~64 个节点的硬上限，新节点建了也不出声 —— 就是"突然没声音"。
-     解法：init() 之后用 OfflineAudioContext 把 4 种枪声各渲染成
-           一段单声道 AudioBuffer。播放时只建 1 个 bufferSource，
-           节点占用从 18 降到 3。1000 发/秒也不会耗尽。
-
-   ★ 其他优化：
-     - 主链 WaveShaper 软限幅器（tanh）—— 不再削波爆音
-     - latencyHint: 'interactive'
-     - 敌人枪声限流 + 距离优先（不让远处的枪把近处的挤掉）
-     - autodisconnect —— 播完自动断开，避免节点泄漏
-     - visibilitychange 主动 resume —— 切后台回来不会静音
    ========================================================================= */
 "use strict";
 
@@ -23,23 +7,16 @@ const SFX = (function(){
   let ctx = null, master = null, noiseBuf = null, ready = false, ambNodes = [];
   let verbSend = null;
 
-  /* ---- 预渲染的枪声 buffer ---- */
-  const GUN_BUF = { rifle: null, shotgun: null, sniper: null, pistol: null };
+  const GUN_BUF = { 
+    rifle: null, shotgun: null, sniper: null, pistol: null,
+    suppressed_rifle: null, suppressed_sniper: null
+  };
   let prerenderStarted = false;
 
-  /* ---- 敌人枪声限流 ---- */
   const ENEMY_GUN = {
-    maxVoices: 8,           // 同时活跃的敌人枪声上限
-    minGap: 0.008,          // 敌人枪声之间最小间隔
-    voices: [],
-    lastAt: 0,
-    lastPlayerAt: 0,
-    playerWindow: 0.12,     // 玩家开火后的清场窗口
+    maxVoices: 8, minGap: 0.008, voices: [], lastAt: 0, lastPlayerAt: 0, playerWindow: 0.12
   };
 
-  /* -------------------------------------------------------------------
-     init
-     ------------------------------------------------------------------- */
   function init(){
     if (ctx){
       if (ctx.state === 'suspended') ctx.resume();
@@ -50,7 +27,6 @@ const SFX = (function(){
 
     ctx = new AC({ latencyHint: 'interactive' });
 
-    /* 软限幅器 —— tanh 曲线 */
     const limiter = ctx.createWaveShaper();
     const N = 2048;
     const curve = new Float32Array(N);
@@ -62,25 +38,18 @@ const SFX = (function(){
     limiter.oversample = '2x';
 
     const comp = ctx.createDynamicsCompressor();
-    comp.threshold.value = -12;
-    comp.knee.value      = 20;
-    comp.ratio.value     = 8;
-    comp.attack.value    = 0.003;
-    comp.release.value   = 0.22;
+    comp.threshold.value = -12; comp.knee.value = 20; comp.ratio.value = 8;
+    comp.attack.value = 0.003; comp.release.value = 0.22;
 
     master = ctx.createGain();
     master.gain.value = 1.0;
-    master.connect(comp);
-    comp.connect(limiter);
-    limiter.connect(ctx.destination);
+    master.connect(comp); comp.connect(limiter); limiter.connect(ctx.destination);
 
-    /* 噪声缓冲区 4s */
     const len = ctx.sampleRate * 4;
     noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate);
     const d = noiseBuf.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
 
-    /* 场地混响 */
     if (ctx.createConvolver){
       const sr = ctx.sampleRate, ir = ctx.createBuffer(2, (sr * 1.6) | 0, sr);
       const echoes = [0.021, 0.037, 0.058, 0.081, 0.112, 0.147, 0.191, 0.244];
@@ -93,8 +62,7 @@ const SFX = (function(){
         echoes.forEach((e, k) => {
           const i = ((e + (ch ? 0.004 : 0)) * sr) | 0;
           const a = 0.62 * Math.pow(0.72, k);
-          for (let j = 0; j < 220; j++)
-            if (i + j < b.length) b[i + j] += (Math.random() * 2 - 1) * a * (1 - j / 220);
+          for (let j = 0; j < 220; j++) if (i + j < b.length) b[i + j] += (Math.random() * 2 - 1) * a * (1 - j / 220);
         });
       }
       const conv = ctx.createConvolver(); conv.buffer = ir;
@@ -109,7 +77,6 @@ const SFX = (function(){
     startAmbient();
     loadSamples();
 
-    /* 异步预渲染 4 种枪声，不阻塞初始化 */
     if (!prerenderStarted){
       prerenderStarted = true;
       prerenderGunshots().catch(() => {});
@@ -141,14 +108,6 @@ const SFX = (function(){
     };
   }
 
-  /* ==========================================================================
-     参数化合成内核 —— 在线和离线共用
-
-     mkNoise / mkTone 由调用方提供：
-       在线版直接用模块级的 noise / tone
-       离线版用临时上下文里的同名函数
-     ========================================================================== */
-
   function synthGunshot(kind, vol, delay, noiseFn, toneFn){
     if (kind === 'rifle'){
       noiseFn({ type: 'highpass', freq: 4200, gain: .62 * vol, dur: .022, atk: .0004, delay });
@@ -157,6 +116,15 @@ const SFX = (function(){
       toneFn({ type: 'triangle', f0: 210, f1: 48, dur: .10, gain: .42 * vol, delay });
       toneFn({ type: 'sine', f0: 82, f1: 38, dur: .14, gain: .34 * vol, lp: 200, delay });
       noiseFn({ type: 'highpass', freq: 1400, gain: .10 * vol, dur: .42, atk: .02, delay: delay + .02 });
+    } else if (kind === 'suppressed_rifle') {
+      noiseFn({ type: 'lowpass', freq: 850, gain: .45 * vol, dur: .10, atk: .0005, delay, verb: .15 });
+      noiseFn({ freq: 320, q: 1.2, gain: .35 * vol, dur: .15, atk: .001, sweep: 150, delay, verb: .1 });
+      toneFn({ type: 'triangle', f0: 140, f1: 50, dur: .06, gain: .20 * vol, delay });
+    } else if (kind === 'suppressed_sniper') {
+      noiseFn({ type: 'lowpass', freq: 600, gain: .65 * vol, dur: .15, atk: .0005, delay, verb: .25 });
+      noiseFn({ freq: 250, q: .8, gain: .55 * vol, dur: .25, atk: .002, sweep: 100, delay, verb: .15 });
+      toneFn({ type: 'sine', f0: 90, f1: 35, dur: .12, gain: .45 * vol, delay });
+      noiseFn({ type: 'highpass', freq: 1000, gain: .05 * vol, dur: .20, atk: .01, delay: delay + .02 });
     } else if (kind === 'shotgun'){
       noiseFn({ type: 'highpass', freq: 3600, gain: .50 * vol, dur: .026, atk: .0004, delay });
       noiseFn({ type: 'lowpass', freq: 900, gain: 1.05 * vol, dur: .42, atk: .001, sweep: 170, delay, verb: .75 });
@@ -173,7 +141,7 @@ const SFX = (function(){
       toneFn({ type: 'sine', f0: 58, f1: 26, dur: .30, gain: .44 * vol, lp: 150, delay });
       noiseFn({ type: 'bandpass', freq: 900, q: .8, gain: .30 * vol, dur: 1.25, atk: .05, delay: delay + .05 });
       noiseFn({ type: 'highpass', freq: 2200, gain: .14 * vol, dur: .85, atk: .03, delay: delay + .02 });
-    } else { /* pistol */
+    } else {
       noiseFn({ type: 'highpass', freq: 4600, gain: .42 * vol, dur: .016, atk: .0003, delay });
       noiseFn({ freq: 1700, q: 1.1, gain: .70 * vol, dur: .11, atk: .001, sweep: 520, delay, verb: .45 });
       noiseFn({ type: 'lowpass', freq: 340, gain: .40 * vol, dur: .075, atk: .001, delay });
@@ -183,37 +151,26 @@ const SFX = (function(){
     }
   }
 
-  /* ==========================================================================
-     在线 noise / tone —— 用实时 ctx
-     ========================================================================== */
   function noise(o){
     if (!ready) return;
     const t0 = T() + (o.delay || 0);
-    const src = ctx.createBufferSource();
-    src.buffer = noiseBuf;
-    src.loop = true;
+    const src = ctx.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
     src.playbackRate.value = o.rate || 1;
     const f = ctx.createBiquadFilter();
-    f.type = o.type || 'bandpass';
-    f.frequency.value = o.freq || 1000;
-    f.Q.value = o.q || 1;
+    f.type = o.type || 'bandpass'; f.frequency.value = o.freq || 1000; f.Q.value = o.q || 1;
     if (o.sweep) f.frequency.exponentialRampToValueAtTime(Math.max(40, o.sweep), t0 + (o.dur || .15));
     const g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, t0);
     g.gain.exponentialRampToValueAtTime(Math.max(.0002, o.gain || .4), t0 + (o.atk || 0.002));
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + (o.dur || .15));
     const cleanup = chain([src, f, g], o.pan, o.out, o.verb);
-    const dur = o.dur || .15;
-    src.start(t0, Math.random() * 3);
-    src.stop(t0 + dur + 0.02);
-    src.onended = cleanup;
+    src.start(t0, Math.random() * 3); src.stop(t0 + (o.dur || .15) + 0.02); src.onended = cleanup;
   }
 
   function tone(o){
     if (!ready) return;
     const t0 = T() + (o.delay || 0);
-    const osc = ctx.createOscillator();
-    osc.type = o.type || 'sine';
+    const osc = ctx.createOscillator(); osc.type = o.type || 'sine';
     osc.frequency.setValueAtTime(o.f0 || 200, t0);
     if (o.f1) osc.frequency.exponentialRampToValueAtTime(Math.max(20, o.f1), t0 + (o.dur || .2));
     const g = ctx.createGain();
@@ -221,46 +178,29 @@ const SFX = (function(){
     g.gain.exponentialRampToValueAtTime(Math.max(.0002, o.gain || .2), t0 + (o.atk || 0.004));
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + (o.dur || .2));
     const nodes = [osc, g];
-    if (o.lp){
-      const f = ctx.createBiquadFilter();
-      f.type = 'lowpass'; f.frequency.value = o.lp;
-      nodes.splice(1, 0, f);
-    }
+    if (o.lp){ const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = o.lp; nodes.splice(1, 0, f); }
     const cleanup = chain(nodes, o.pan, o.out, o.verb);
-    const dur = o.dur || .2;
-    osc.start(t0);
-    osc.stop(t0 + dur + 0.02);
-    osc.onended = cleanup;
+    osc.start(t0); osc.stop(t0 + (o.dur || .2) + 0.02); osc.onended = cleanup;
   }
 
-  /* ==========================================================================
-     OfflineAudioContext 预渲染
-     ========================================================================== */
   function mkOfflineSynth(off, offNoiseBuf){
-    const offVerb = null;
     function offNoise(o){
       const t0 = o.delay || 0;
-      const src = off.createBufferSource();
-      src.buffer = offNoiseBuf;
-      src.loop = true;
+      const src = off.createBufferSource(); src.buffer = offNoiseBuf; src.loop = true;
       src.playbackRate.value = o.rate || 1;
       const f = off.createBiquadFilter();
-      f.type = o.type || 'bandpass';
-      f.frequency.value = o.freq || 1000;
-      f.Q.value = o.q || 1;
+      f.type = o.type || 'bandpass'; f.frequency.value = o.freq || 1000; f.Q.value = o.q || 1;
       if (o.sweep) f.frequency.exponentialRampToValueAtTime(Math.max(40, o.sweep), t0 + (o.dur || .15));
       const g = off.createGain();
       g.gain.setValueAtTime(0.0001, t0);
       g.gain.exponentialRampToValueAtTime(Math.max(.0002, o.gain || .4), t0 + (o.atk || 0.002));
       g.gain.exponentialRampToValueAtTime(0.0001, t0 + (o.dur || .15));
       src.connect(f); f.connect(g); g.connect(off.destination);
-      src.start(t0, Math.random() * 3);
-      src.stop(t0 + (o.dur || .15) + 0.02);
+      src.start(t0, Math.random() * 3); src.stop(t0 + (o.dur || .15) + 0.02);
     }
     function offTone(o){
       const t0 = o.delay || 0;
-      const osc = off.createOscillator();
-      osc.type = o.type || 'sine';
+      const osc = off.createOscillator(); osc.type = o.type || 'sine';
       osc.frequency.setValueAtTime(o.f0 || 200, t0);
       if (o.f1) osc.frequency.exponentialRampToValueAtTime(Math.max(20, o.f1), t0 + (o.dur || .2));
       const g = off.createGain();
@@ -268,16 +208,11 @@ const SFX = (function(){
       g.gain.exponentialRampToValueAtTime(Math.max(.0002, o.gain || .2), t0 + (o.atk || 0.004));
       g.gain.exponentialRampToValueAtTime(0.0001, t0 + (o.dur || .2));
       const nodes = [osc, g];
-      if (o.lp){
-        const f = off.createBiquadFilter();
-        f.type = 'lowpass'; f.frequency.value = o.lp;
-        nodes.splice(1, 0, f);
-      }
+      if (o.lp){ const f = off.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = o.lp; nodes.splice(1, 0, f); }
       let prev = null;
       for (const n of nodes){ if (prev) prev.connect(n); prev = n; }
       prev.connect(off.destination);
-      osc.start(t0);
-      osc.stop(t0 + (o.dur || .2) + 0.02);
+      osc.start(t0); osc.stop(t0 + (o.dur || .2) + 0.02);
     }
     return { noise: offNoise, tone: offTone };
   }
@@ -286,7 +221,6 @@ const SFX = (function(){
     const dur = kind === 'shotgun' ? 1.2 : kind === 'sniper' ? 2.6 : 0.9;
     const sr = ctx.sampleRate;
     const off = new OfflineAudioContext(1, Math.ceil(sr * dur), sr);
-    /* 离线版也需要一条噪声源 */
     const offNB = off.createBuffer(1, sr * 4, sr);
     const nd = offNB.getChannelData(0);
     for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
@@ -296,39 +230,24 @@ const SFX = (function(){
   }
 
   async function prerenderGunshots(){
-    const kinds = ['rifle', 'shotgun', 'sniper', 'pistol'];
+    const kinds = ['rifle', 'shotgun', 'sniper', 'pistol', 'suppressed_rifle', 'suppressed_sniper'];
     for (const kind of kinds){
-      try {
-        GUN_BUF[kind] = await renderGunshot(kind);
-      } catch (e){
-        GUN_BUF[kind] = null;
-      }
+      try { GUN_BUF[kind] = await renderGunshot(kind); } catch (e){ GUN_BUF[kind] = null; }
     }
   }
 
-  /* ==========================================================================
-     枪声播放
-     ========================================================================== */
   function gunshot(kind, pan, dist){
     if (!ready) return;
-
-    /* 上下文被浏览器自动挂起时先恢复，否则这一发就彻底丢了 */
-    if (ctx.state !== 'running'){
-      try { ctx.resume(); } catch(e){}
-      return;
-    }
+    if (ctx.state !== 'running'){ try { ctx.resume(); } catch(e){} return; }
 
     const isPlayer = (pan === 0 && (dist === 0 || dist === undefined || dist === null));
 
-    /* ---- 玩家枪声：永远优先 ---- */
     if (isPlayer){
-      ENEMY_GUN.lastPlayerAt = T();
-      ENEMY_GUN.lastAt = T();
+      ENEMY_GUN.lastPlayerAt = T(); ENEMY_GUN.lastAt = T();
       playGunBuffer(kind, 1.0, 0, false);
       return;
     }
 
-    /* ---- 敌人枪声：限流 ---- */
     const now = T();
     if (now - ENEMY_GUN.lastPlayerAt < ENEMY_GUN.playerWindow) return;
     if (now - ENEMY_GUN.lastAt < ENEMY_GUN.minGap) return;
@@ -346,14 +265,14 @@ const SFX = (function(){
     playGunBuffer(kind, far * far, pan, true);
   }
 
-  /** 播放一发枪声。每发只占 1 个 bufferSource + 1 个 gain（+ 1 个 panner）。
-      节点数从 18 降到最多 3，永不会打满移动端的节点上限。 */
   function playGunBuffer(kind, vol, pan, isEnemy){
     const buf = GUN_BUF[kind];
     if (!buf){
-      /* 预渲染还没完成 —— 用在线合成兜底 */
       if (isEnemy){
-        const synth = { rifle: 'rifle', shotgun: 'shotgun', sniper: 'sniper', pistol: 'pistol' }[kind] || 'rifle';
+        const synth = { 
+          rifle: 'rifle', shotgun: 'shotgun', sniper: 'sniper', pistol: 'pistol',
+          suppressed_rifle: 'suppressed_rifle', suppressed_sniper: 'suppressed_sniper'
+        }[kind] || 'rifle';
         const far = clamp(vol, 0.05, 1);
         synthGunshot(synth, far, 0, noise, tone);
       } else {
@@ -364,37 +283,22 @@ const SFX = (function(){
 
     const src = ctx.createBufferSource();
     src.buffer = buf;
-    /* 敌人枪声音量随距离衰减；播放速率轻微随机化，避免同款枪听感克隆 */
     src.playbackRate.value = 0.97 + Math.random() * 0.06;
 
-    const g = ctx.createGain();
-    g.gain.value = clamp(vol, 0, 1);
-
+    const g = ctx.createGain(); g.gain.value = clamp(vol, 0, 1);
     const p = panner(pan);
     src.connect(g);
-    if (p){ g.connect(p); p.connect(master); }
-    else g.connect(master);
+    if (p){ g.connect(p); p.connect(master); } else g.connect(master);
 
     src.start();
-    src.onended = () => {
-      try { src.disconnect(); } catch(e){}
-      try { g.disconnect(); } catch(e){}
-      if (p) try { p.disconnect(); } catch(e){}
-    };
+    src.onended = () => { try { src.disconnect(); } catch(e){} try { g.disconnect(); } catch(e){} if (p) try { p.disconnect(); } catch(e){} };
   }
 
-  /* ==========================================================================
-     环境底噪
-     ========================================================================== */
   function startAmbient(){
-    const src = ctx.createBufferSource();
-    src.buffer = noiseBuf; src.loop = true;
-    const lp = ctx.createBiquadFilter();
-    lp.type = 'lowpass'; lp.frequency.value = 170; lp.Q.value = .6;
+    const src = ctx.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 170; lp.Q.value = .6;
     const g = ctx.createGain(); g.gain.value = 0.055;
-    src.connect(lp); lp.connect(g); g.connect(master);
-    src.start();
-    ambNodes.push(src);
+    src.connect(lp); lp.connect(g); g.connect(master); src.start(); ambNodes.push(src);
 
     [46, 69, 103].forEach((f, i) => {
       const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f;
@@ -403,21 +307,16 @@ const SFX = (function(){
       const lg = ctx.createGain(); lg.gain.value = 0.009 / (i + 1);
       lfo.connect(lg); lg.connect(og.gain);
       o.connect(og); og.connect(master);
-      o.start(); lfo.start();
-      ambNodes.push(o, lfo);
+      o.start(); lfo.start(); ambNodes.push(o, lfo);
     });
 
     (function creak(){
       if (!ready) return;
-      tone({ type: 'sawtooth', f0: rand(90, 220), f1: rand(60, 130),
-             dur: rand(.7, 1.6), gain: 0.012, lp: 700, pan: rand(-.9, .9) });
+      tone({ type: 'sawtooth', f0: rand(90, 220), f1: rand(60, 130), dur: rand(.7, 1.6), gain: 0.012, lp: 700, pan: rand(-.9, .9) });
       setTimeout(creak, rand(6000, 15000));
     })();
   }
 
-  /* ==========================================================================
-     其他音效
-     ========================================================================== */
   function radio(){
     noise({ type: 'bandpass', freq: 2600, q: 3.2, gain: .055, dur: .045, atk: .001 });
     tone({ type: 'square', f0: 1180, f1: 1180, dur: .028, gain: .028, lp: 3000, delay: .03 });
@@ -466,9 +365,7 @@ const SFX = (function(){
     noise({ type: 'lowpass', freq: rand(380, 620), gain: .16 * vol, dur: .075, atk: .002, rate: rand(.85, 1.15), pan });
     noise({ type: 'highpass', freq: rand(2400, 4200), gain: .045 * vol, dur: .035, pan });
   }
-  function jumpSound(){
-    noise({ type: 'lowpass', freq: 500, gain: .10, dur: .09 });
-  }
+  function jumpSound(){ noise({ type: 'lowpass', freq: 500, gain: .10, dur: .09 }); }
   function landSound(f){
     noise({ type: 'lowpass', freq: 300, gain: .10 + .28 * f, dur: .16, atk: .002 });
     tone({ type: 'sine', f0: 110, f1: 44, dur: .13, gain: .14 * f });
@@ -478,8 +375,7 @@ const SFX = (function(){
     const v = clamp(1 - dist / 60, .15, 1);
     noise({ type: 'bandpass', freq: rand(2200, 3800), q: 2.5, gain: .26 * v, dur: .07, atk: .001, pan });
     noise({ type: 'lowpass', freq: 700, gain: .14 * v, dur: .09, pan });
-    if (Math.random() < 0.28)
-      tone({ type: 'sine', f0: rand(2400, 3400), f1: rand(700, 1100), dur: .30, gain: .05 * v, pan });
+    if (Math.random() < 0.28) tone({ type: 'sine', f0: rand(2400, 3400), f1: rand(700, 1100), dur: .30, gain: .05 * v, pan });
   }
 
   function impactFlesh(pan, dist){
@@ -525,8 +421,7 @@ const SFX = (function(){
     tone({ type: 'square', f0: 430, f1: 250, dur: .09, gain: .09, lp: 2400 });
   }
   function shieldBreak(pan){
-    if (!sample('armor', 0.85, pan, 0.72))
-      noise({ type: 'highpass', freq: 2500, gain: .26, dur: .24, atk: .001 });
+    if (!sample('armor', 0.85, pan, 0.72)) noise({ type: 'highpass', freq: 2500, gain: .26, dur: .24, atk: .001 });
     tone({ type: 'sawtooth', f0: 320, f1: 64, dur: .32, gain: .12, lp: 1500 });
   }
 
@@ -551,25 +446,17 @@ const SFX = (function(){
     noise({ type: 'bandpass', freq: 2600, q: 2.5, gain: .03, dur: .10 });
   }
 
-  /* ★ 闪光弹音效：震撼爆炸 + 3秒尖锐耳鸣 */
   function flashBang(dist){
     if (!ready) return;
     const vol = clamp(1 - (dist || 0) / 30, 0, 1);
     if (vol <= 0.01) return;
-
-    // 巨大的爆炸声
     noise({ type: 'lowpass', freq: 600, gain: 1.2 * vol, dur: 0.4, atk: 0.001, sweep: 80, verb: 0.9 });
     tone({ type: 'sine', f0: 100, f1: 30, dur: 0.3, gain: 0.8 * vol, lp: 150 });
-
-    // 3秒的尖锐耳鸣声（3个频率叠加，模拟真实耳鸣）
     tone({ type: 'sine', f0: 4200, dur: 3.0, gain: 0.18 * vol, lp: 8000 });
     tone({ type: 'sine', f0: 4800, dur: 3.0, gain: 0.12 * vol, lp: 8000, delay: 0.03 });
     tone({ type: 'sine', f0: 3600, dur: 3.0, gain: 0.08 * vol, lp: 8000, delay: 0.05 });
   }
 
-  /* ==========================================================================
-     采样文件
-     ========================================================================== */
   const SAMP = {
     kill1: 'kill1.wav', kill2: 'kill2.wav', kill3: 'kill3.wav',
     kill4: 'kill4.wav', kill5: 'kill5.wav',
@@ -583,7 +470,12 @@ const SFX = (function(){
 
   function buildSampleElements(){
     for (const n in SAMP)
-      sampEl[n] = [0, 1, 2].map(() => { const a = new Audio(sampURL(n)); a.preload = 'auto'; return a; });
+      sampEl[n] = [0, 1, 2].map(() => { 
+        const a = new Audio(sampURL(n)); 
+        a.preload = 'auto'; 
+        a.onerror = () => {}; // 忽略加载失败的错误
+        return a; 
+      });
   }
 
   function loadSamples(){
@@ -598,7 +490,7 @@ const SFX = (function(){
         .then(r => r.ok ? r.arrayBuffer() : Promise.reject(new Error(r.status)))
         .then(decode)
         .then(b => { sampBuf[n] = b; })
-        .catch(() => {})
+        .catch(() => {}) // 忽略失败的音效
     )).then(() => {
       sampMode = Object.keys(sampBuf).length ? 'buf' : 'el';
       if (sampMode === 'el') buildSampleElements();
@@ -616,11 +508,7 @@ const SFX = (function(){
       const p = pan ? panner(pan) : null;
       src.connect(g); g.connect(p || master);
       src.start();
-      src.onended = () => {
-        try { src.disconnect(); } catch(e){}
-        try { g.disconnect(); } catch(e){}
-        if (p) try { p.disconnect(); } catch(e){}
-      };
+      src.onended = () => { try { src.disconnect(); } catch(e){} try { g.disconnect(); } catch(e){} if (p) try { p.disconnect(); } catch(e){} };
       return true;
     }
     const pool = sampEl[name];
@@ -631,7 +519,7 @@ const SFX = (function(){
         a.volume = clamp((vol == null ? 1 : vol) * 0.9, 0, 1);
         a.playbackRate = clamp(rate || 1, 0.25, 4);
         const pr = a.play();
-        if (pr && pr.catch) pr.catch(() => {});
+        if (pr && pr.catch) pr.catch(() => {}); // 捕获播放失败
         return true;
       } catch (err){}
     }
@@ -646,15 +534,12 @@ const SFX = (function(){
   let rainGain = null;
   function startRainBed(){
     if (!ready || rainGain) return;
-    const src = ctx.createBufferSource();
-    src.buffer = noiseBuf; src.loop = true;
+    const src = ctx.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
     const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 850;
     const lp = ctx.createBiquadFilter(); lp.type = 'lowpass';  lp.frequency.value = 7200; lp.Q.value = 0.4;
     const g  = ctx.createGain(); g.gain.value = 0.0001;
-    src.connect(hp); hp.connect(lp); lp.connect(g); g.connect(master);
-    src.start();
-    rainGain = g;
-    ambNodes.push(src);
+    src.connect(hp); hp.connect(lp); lp.connect(g); g.connect(master); src.start();
+    rainGain = g; ambNodes.push(src);
   }
   function setRain(level){
     if (!ready) return false;
@@ -677,16 +562,13 @@ const SFX = (function(){
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden && ctx && ctx.state === 'suspended') ctx.resume();
   });
-  window.addEventListener('focus', () => {
-    if (ctx && ctx.state === 'suspended') ctx.resume();
-  });
+  window.addEventListener('focus', () => { if (ctx && ctx.state === 'suspended') ctx.resume(); });
 
   return {
     init, gunshot, radio, dryFire, magOut, magIn, boltClick, pumpSound, boltCycle,
     shellDrop, footstep, jumpSound, landSound, impactWall, impactFlesh,
     hitBeep, killChime, enemyDeath, heartbeat, damageTaken,
     shieldHit, shieldBreak, healStart, healDone, dronePulse,
-    alarm, suspend, resume, setRain, thunder, bossDown,
-    flashBang /* ★ 新增：闪光弹音效 */
+    alarm, suspend, resume, setRain, thunder, bossDown, flashBang
   };
 })();

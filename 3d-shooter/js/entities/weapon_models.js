@@ -1,10 +1,10 @@
 /* =========================================================================
    weapon_models.js
-   手持武器模型 —— M4 / 霰弹枪 / 手枪 / 狙击枪，含手套和袖管
+   手持武器模型 —— M4 / 霰弹枪 / 手枪 / 狙击枪 / 巴雷特，含手套和袖管
 
    依赖：utils.js（part/B/CYL/CYLZ/TUBEZ/PI/rand/randI/cvs/finishTex/grain/sRGB/linearizeMats）
          textures.js（TEX）
-   暴露：buildRifle, buildShotgun, buildPistol, buildSniper,
+   暴露：buildRifle, buildShotgun, buildPistol, buildSniper, buildBarrett,
          makeHand, texelize, GUN_PER_M,
          GUNMETAL, POLYMER, POLYTAN, STEEL, GLOVE, GLOVEPAD, SKIN,
          SLEEVE, SLEEVE_D, ACCENT_R, OPTIC_GLASS, TUBE_MAT
@@ -188,10 +188,13 @@ function buildRifle(){
 
   /* 下机匣 + 弹匣井 */
   part(G, B(0.056, 0.072, 0.13), POLYMER, 0, -0.062, -0.06);
+  
   const mag = new THREE.Group();
   mag.position.set(0, -0.135, -0.045);
   mag.rotation.x = 0.18;
   G.add(mag);
+  
+    // ... 其他参数
   part(mag, B(0.048, 0.150, 0.082), POLYTAN, 0, 0, 0);
   /* 弹匣侧加强筋 */
   for (let i = 0; i < 4; i++){
@@ -386,10 +389,15 @@ function buildPistol(){
   for (let i = 0; i < 3; i++)
     part(G, B(0.046, 0.014, 0.010), GLOVEPAD, 0, -0.040, -0.070 - i * 0.024);
 
+  // 在手枪构建代码里，找到握把部分，给他加一个能掉出来的弹匣
   const grip = new THREE.Group();
   grip.position.set(0, -0.040, 0.030);
   grip.rotation.x = -0.28;
   G.add(grip);
+
+  
+
+
   part(grip, B(0.042, 0.135, 0.058), POLYMER, 0, -0.066, 0);
   for (let i = 0; i < 5; i++)
     part(grip, B(0.044, 0.009, 0.062), GLOVEPAD, 0, -0.028 - i * 0.021, 0);
@@ -420,101 +428,267 @@ function buildPistol(){
 }
 
 /* =========================================================================
-   SR-7 长弓
+   SR-7 长弓 (精修版：修复断尾，优化枪托骨架与贴腮板)
    ========================================================================= */
 function buildSniper(){
   const G = new THREE.Group();
-  part(G, B(0.070, 0.082, 0.40), GUNMETAL, 0, 0, -0.02);
-  part(G, B(0.056, 0.022, 0.44), GUNMETAL, 0, 0.050, -0.03);
-  for (let i = 0; i < 16; i++)
-    part(G, B(0.048, 0.009, 0.010), POLYMER, 0, 0.064, -0.22 + i * 0.026);
-  part(G, CYLZ(0.0215, 0.0195, 0.62, 12), STEEL, 0, 0.004, -0.55);
-  for (let i = 0; i < 8; i++)
-    part(G, B(0.046, 0.007, 0.030), GUNMETAL, 0, 0.004, -0.34 - i * 0.062);
-  part(G, CYLZ(0.030, 0.028, 0.09, 12), GUNMETAL, 0, 0.004, -0.90);
-  for (let i = 0; i < 4; i++)
-    part(G, B(0.064, 0.008, 0.012), GUNMETAL, 0, 0.004, -0.875 - i * 0.020);
-  part(G, CYLZ(0.023, 0.023, 0.014, 12), POLYMER, 0, 0.004, -0.946);
-  part(G, B(0.076, 0.062, 0.34), POLYTAN, 0, -0.020, -0.36);
-  for (let i = 0; i < 5; i++)
-    part(G, B(0.080, 0.014, 0.024), POLYMER, 0, -0.030, -0.48 + i * 0.058);
-  part(G, B(0.050, 0.014, 0.30), POLYTAN, 0, 0.014, -0.36);
 
+  // ---- 1. 主机匣 ----
+  part(G, B(0.076, 0.088, 0.48), GUNMETAL, 0, 0, -0.06);
+  part(G, B(0.060, 0.026, 0.48), GUNMETAL, 0, 0.057, -0.06);
+  // 顶部导轨
+  for (let i = 0; i < 18; i++)
+    part(G, B(0.052, 0.010, 0.012), POLYMER, 0, 0.070, -0.28 + i * 0.025);
+  part(G, B(0.058, 0.008, 0.48), GUNMETAL, 0, 0.065, -0.06);
+
+  // ---- 2. 超长枪管与制退器 ----
+  part(G, CYLZ(0.022, 0.020, 0.95, 12), STEEL, 0, 0.004, -0.78);
+  for (let i = 0; i < 10; i++)
+    part(G, B(0.048, 0.006, 0.035), GUNMETAL, 0, 0.004, -0.45 - i * 0.06);
+  // 大型方形制退器
+  part(G, B(0.065, 0.065, 0.12), GUNMETAL, 0, 0.004, -1.28);
+  part(G, CYLZ(0.024, 0.024, 0.04, 12), POLYMER, 0, 0.004, -1.35);
+  part(G, B(0.070, 0.020, 0.030), GLOVEPAD, 0, 0.015, -1.25);
+  part(G, B(0.070, 0.020, 0.030), GLOVEPAD, 0, -0.007, -1.25);
+
+  // ---- 3. 战术护木 ----
+  part(G, B(0.085, 0.075, 0.55), POLYTAN, 0, -0.020, -0.58);
+  for (let i = 0; i < 7; i++){
+    part(G, B(0.088, 0.028, 0.045), GLOVEPAD, 0, -0.020, -0.38 - i * 0.07);
+  }
+  part(G, B(0.060, 0.018, 0.52), POLYTAN, 0, 0.020, -0.58);
+  part(G, B(0.045, 0.035, 0.10), GUNMETAL, 0.045, 0.010, -0.65); // 战术激光盒
+
+  // ---- 4. 折叠两脚架 ----
   const bp = new THREE.Group();
-  bp.position.set(0, -0.056, -0.47);
+  bp.position.set(0, -0.055, -0.82);
   G.add(bp);
-  part(bp, B(0.026, 0.020, 0.07), GUNMETAL, 0, 0, 0);
-  part(bp, CYLZ(0.0075, 0.0075, 0.17, 8), STEEL, -0.020, -0.010, 0.055, 0.30, 0, 0);
-  part(bp, CYLZ(0.0075, 0.0075, 0.17, 8), STEEL,  0.020, -0.010, 0.055, 0.30, 0, 0);
+  part(bp, B(0.030, 0.020, 0.08), GUNMETAL, 0, 0, 0);
+  part(bp, CYLZ(0.008, 0.008, 0.22, 8), STEEL, -0.015, -0.015, 0.09, 0.28, 0, 0.1);
+  part(bp, CYLZ(0.008, 0.008, 0.22, 8), STEEL,  0.015, -0.015, 0.09, 0.28, 0, -0.1);
 
+  // ---- 5. 狙击镜 ----
   const sc = new THREE.Group();
-  sc.position.set(0, 0.118, -0.10);
+  sc.position.set(0, 0.115, -0.08);
   G.add(sc);
-  part(sc, CYLZ(0.0225, 0.0225, 0.30, 16), GUNMETAL, 0, 0, 0);
-  part(sc, CYLZ(0.0335, 0.0335, 0.075, 16), GUNMETAL, 0, 0, -0.185);
-  part(sc, CYLZ(0.0290, 0.0290, 0.060, 16), GUNMETAL, 0, 0,  0.170);
-  part(sc, CYLZ(0.0300, 0.0300, 0.008, 16), OPTIC_GLASS, 0, 0, -0.221);
-  part(sc, CYLZ(0.0255, 0.0255, 0.008, 16), OPTIC_GLASS, 0, 0,  0.199);
-  part(sc, CYL(0.017, 0.017, 0.030, 12), GUNMETAL, 0, 0.030, -0.02);
-  part(sc, B(0.030, 0.006, 0.030), POLYMER, 0, 0.046, -0.02);
-  part(sc, CYLZ(0.016, 0.016, 0.030, 12), GUNMETAL, 0.030, 0, -0.02, 0, PI / 2, 0);
-  part(sc, CYLZ(0.0155, 0.0155, 0.028, 12), GUNMETAL, 0, 0,  0.075);
-  for (let i = 0; i < 8; i++)
-    part(sc, B(0.005, 0.034, 0.026), POLYMER, 0, 0, 0.075, 0, 0, i * PI / 4);
-  part(G, B(0.036, 0.052, 0.030), GUNMETAL, 0, 0.086, -0.20);
-  part(G, B(0.036, 0.052, 0.030), GUNMETAL, 0, 0.086,  0.00);
+  part(sc, CYLZ(0.024, 0.024, 0.40, 16), GUNMETAL, 0, 0, 0);
+  part(sc, CYLZ(0.038, 0.030, 0.12, 16), GUNMETAL, 0, 0, -0.24);
+  part(sc, CYLZ(0.042, 0.042, 0.06, 16), GUNMETAL, 0, 0, -0.32);
+  part(sc, CYLZ(0.032, 0.032, 0.01, 16), OPTIC_GLASS, 0, 0, -0.35);
+  part(sc, CYLZ(0.034, 0.034, 0.10, 16), GUNMETAL, 0, 0,  0.23);
+  part(sc, CYLZ(0.026, 0.026, 0.01, 16), OPTIC_GLASS, 0, 0,  0.28);
+  part(sc, CYLZ(0.028, 0.028, 0.03, 16), STEEL, 0, 0, 0.12);
+  part(sc, CYL(0.018, 0.018, 0.035, 12), GUNMETAL, 0, 0.028, 0);
+  part(G, B(0.036, 0.052, 0.035), GUNMETAL, 0, 0.085, -0.20);
+  part(G, B(0.036, 0.052, 0.035), GUNMETAL, 0, 0.085,  0.05);
 
-  const bolt = new THREE.Group();
-  bolt.position.set(0.038, 0.026, 0.10);
-  G.add(bolt);
-  part(bolt, CYLZ(0.012, 0.012, 0.11, 10), STEEL, 0, 0, 0);
-  const knob = new THREE.Group();
-  knob.position.set(0, 0, 0.050);
-  bolt.add(knob);
-  part(knob, CYLZ(0.0095, 0.0095, 0.062, 8), STEEL, 0.026, 0, 0, 0, PI / 2, 0);
-  part(knob, new THREE.SphereGeometry(0.0185, 10, 8), GUNMETAL, 0.058, 0, 0);
-
+  // ---- 6. 弹匣与握把 ----
   const mag = new THREE.Group();
-  mag.position.set(0, -0.098, -0.055);
+  mag.position.set(0, -0.100, -0.08);
+  mag.rotation.x = 0.05;
   G.add(mag);
-  part(mag, B(0.044, 0.110, 0.095), POLYMER, 0, 0, 0);
-  part(mag, B(0.048, 0.014, 0.099), GLOVEPAD, 0, -0.058, 0);
-
-  part(G, B(0.013, 0.030, 0.010), STEEL, 0, -0.052, 0.020);
-  part(G, B(0.046, 0.010, 0.062), POLYMER, 0, -0.070, 0.014);
-  part(G, B(0.046, 0.032, 0.010), POLYMER, 0, -0.056, -0.014);
+  part(mag, B(0.048, 0.130, 0.095), POLYMER, 0, 0, 0);
+  part(mag, B(0.052, 0.014, 0.100), GLOVEPAD, 0, -0.065, 0);
 
   const grip = new THREE.Group();
-  grip.position.set(0, -0.080, 0.105);
-  grip.rotation.x = -0.22;
+  grip.position.set(0, -0.080, 0.08);
+  grip.rotation.x = -0.25;
   G.add(grip);
-  part(grip, B(0.046, 0.130, 0.060), POLYTAN, 0, -0.058, 0);
-  part(grip, B(0.048, 0.030, 0.064), GLOVEPAD, 0, -0.112, 0);
+  part(grip, B(0.046, 0.120, 0.058), POLYTAN, 0, -0.055, 0);
+  part(grip, B(0.048, 0.020, 0.062), GLOVEPAD, 0, -0.110, 0);
 
+  part(G, B(0.013, 0.030, 0.010), STEEL, 0, -0.050, 0.015); // 扳机
+  part(G, B(0.046, 0.010, 0.058), POLYMER, 0, -0.068, 0.012);
+  part(G, B(0.046, 0.032, 0.010), POLYMER, 0, -0.054, -0.016);
+
+  // ---- 7. 战术枪托 (精修版：修复断尾感，增加镂空骨架细节) ----
   const st = new THREE.Group();
-  st.position.set(0, -0.006, 0.235);
+  st.position.set(0, -0.015, 0.25);
   G.add(st);
-  part(st, B(0.058, 0.070, 0.10), POLYTAN, 0, 0, 0);
-  part(st, B(0.050, 0.028, 0.15), POLYTAN, 0, 0.052, 0.075);
-  part(st, CYLZ(0.008, 0.008, 0.05, 8), STEEL, -0.018, 0.026, 0.075, 1.57, 0, 0);
-  part(st, CYLZ(0.008, 0.008, 0.05, 8), STEEL,  0.018, 0.026, 0.075, 1.57, 0, 0);
-  part(st, B(0.052, 0.020, 0.16), POLYTAN, 0, -0.028, 0.080);
-  part(st, B(0.058, 0.110, 0.026), GLOVEPAD, 0, 0.006, 0.168);
-  part(st, B(0.030, 0.040, 0.05), GUNMETAL, 0, -0.052, 0.150);
+  
+  // 缓冲管 (连接机匣)
+  part(st, CYLZ(0.022, 0.022, 0.12, 10), STEEL, 0, 0.01, 0.04);
+  part(st, B(0.052, 0.08, 0.08), POLYTAN, 0, 0, 0.02); 
+  
+  // 骨架上梁
+  part(st, B(0.046, 0.022, 0.26), POLYTAN, 0, 0.04, 0.15);
+  // 骨架下梁 (带一点倾斜，更具现代狙击枪风格)
+  const lowerBar = part(st, B(0.040, 0.020, 0.22), POLYTAN, 0, -0.04, 0.14);
+  lowerBar.rotation.x = 0.08;
+  
+  // 尾部垂直支撑梁 (把上下梁连接起来，防止视觉断层)
+  part(st, B(0.046, 0.120, 0.022), POLYTAN, 0, 0.000, 0.28);
+  
+  // 可调节贴腮板 (加大加宽)
+  part(st, B(0.050, 0.025, 0.18), GLOVEPAD, 0, 0.085, 0.16);
+  // 贴腮板的金属支撑柱
+  part(st, CYL(0.008, 0.008, 0.05, 8), STEEL, 0, 0.055, 0.10);
+  part(st, CYL(0.008, 0.008, 0.05, 8), STEEL, 0, 0.055, 0.22);
+  
+  // 尾端橡胶缓冲垫 (极厚实，彻底告别断尾感)
+  part(st, B(0.052, 0.135, 0.030), GLOVEPAD, 0, 0.000, 0.305);
+  part(st, B(0.048, 0.110, 0.010), GUNMETAL, 0, 0.000, 0.320); // 金属垫片
 
-  const muzzle = new THREE.Object3D(); muzzle.position.set(0, 0.004, -0.96); G.add(muzzle);
-  const eject  = new THREE.Object3D(); eject.position.set(0.055, 0.02, 0.06); G.add(eject);
+  // ---- 8. 拉机柄与抛壳口 ----
+  const bolt = new THREE.Group();
+  bolt.position.set(0.042, 0.026, 0.10);
+  G.add(bolt);
+  part(bolt, CYLZ(0.014, 0.014, 0.14, 10), STEEL, 0, 0, 0);
+  const knob = new THREE.Group();
+  knob.position.set(0, 0, 0.065);
+  bolt.add(knob);
+  part(knob, CYLZ(0.010, 0.010, 0.08, 8), STEEL, 0.032, 0, 0, 0, PI / 2, 0);
+  part(knob, new THREE.SphereGeometry(0.020, 10, 8), GUNMETAL, 0.072, 0, 0);
 
+  part(G, B(0.012, 0.035, 0.085), GUNMETAL, 0.040, 0.015, -0.08); // 抛壳口
+
+  // ---- 9. 枪口与抛壳点 ----
+  const muzzle = new THREE.Object3D(); muzzle.position.set(0, 0.004, -1.38); G.add(muzzle);
+  const eject  = new THREE.Object3D(); eject.position.set(0.055, 0.02, 0.05); G.add(eject);
+
+  // ---- 10. 手部位置 ----
   const hands = new THREE.Group(); G.add(hands);
-  const rh = makeHand(false); rh.position.set(0.010, -0.136, 0.128); rh.rotation.set(0.26, 0, 0.10); hands.add(rh);
-  const lh = makeHand(true);  lh.position.set(-0.012, -0.078, -0.380); lh.rotation.set(0.04, 0, -0.16); hands.add(lh);
+  const rh = makeHand(false); rh.position.set(0.010, -0.135, 0.100); rh.rotation.set(0.26, 0, 0.10); hands.add(rh);
+  const lh = makeHand(true);  lh.position.set(-0.012, -0.075, -0.650); lh.rotation.set(0.04, 0, -0.16); hands.add(lh);
 
   return {
     group: G, muzzle, eject, bolt, knob, hands,
-    basePos: new THREE.Vector3(0.224, -0.262, -1.16),
-    baseRot: new THREE.Vector3(-0.022, 0.084, 0.055),
-    adsPos:  new THREE.Vector3(0.0006, -0.1185, -0.6205),
+    // ✅ 微调持握参数，y 向下压了一点点，yaw 稍微朝内，让长枪托自然延伸到屏幕右下角外
+    basePos: new THREE.Vector3(0.215, -0.255, -1.12),
+    baseRot: new THREE.Vector3(-0.02, 0.10, 0.04),
+    adsPos:  new THREE.Vector3(0.0006, -0.115, -0.70),
     adsRot:  new THREE.Vector3(0, 0, 0),
-    adsRef: 0.7105
+    adsRef: 0.70
+  };
+}
+/* =========================================================================
+   .50 CAL BARRETT (巴雷特 - 终极巨兽版)
+   ========================================================================= */
+function buildBarrett(){
+  const G = new THREE.Group();
+
+  // 材质
+  const BLACK_METAL = new THREE.MeshStandardMaterial({ color: 0x151515, metalness: 0.9, roughness: 0.35 }); 
+  const MATTE_BLACK = new THREE.MeshStandardMaterial({ color: 0x0a0a0a, metalness: 0.2, roughness: 0.85 });  
+  const BLACK_STEEL = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, metalness: 0.98, roughness: 0.2 });  
+
+  // ---- 1. 巨型机匣 ----
+  part(G, B(0.12, 0.14, 0.75), BLACK_METAL, 0, 0, -0.20);
+  part(G, B(0.13, 0.08, 0.65), MATTE_BLACK, 0, -0.05, -0.20);
+  
+  // 顶部导轨
+  part(G, B(0.06, 0.02, 0.70), BLACK_STEEL, 0, 0.08, -0.20);
+  for (let i = 0; i < 26; i++) 
+    part(G, B(0.062, 0.006, 0.015), BLACK_METAL, 0, 0.088, -0.50 + i * 0.025);
+
+  // ---- 2. 超长超重型枪管 ----
+  part(G, CYLZ(0.05, 0.045, 1.40, 16), BLACK_STEEL, 0, 0.005, -1.20);
+  
+  // 枪管减重凹槽
+  for (let i = 0; i < 4; i++) {
+    part(G, CYLZ(0.048, 0.048, 0.15, 16), MATTE_BLACK, 0, 0.005, -0.85 - i * 0.22);
+  }
+  part(G, B(0.12, 0.12, 0.15), BLACK_METAL, 0, 0.005, -0.65); // 导气箍
+
+  // ---- 3. 重做的多室侧排制退器 (彻底告别方块) ----
+  const muzzleGroup = new THREE.Group();
+  muzzleGroup.position.set(0, 0.005, -1.95);
+  G.add(muzzleGroup);
+  
+  // 主体采用圆柱形，看起来更圆润厚重
+  part(muzzleGroup, CYLZ(0.075, 0.075, 0.35, 12), BLACK_METAL, 0, 0, 0);
+  // 增加倾斜的切割面
+  part(muzzleGroup, B(0.16, 0.16, 0.10), BLACK_METAL, 0, 0, -0.10);
+  // 侧面的巨型排气孔（利用挖孔感的几何体拼接）
+  part(muzzleGroup, B(0.18, 0.05, 0.08), MATTE_BLACK, 0, 0.06, -0.05);
+  part(muzzleGroup, B(0.18, 0.05, 0.08), MATTE_BLACK, 0, -0.05, -0.05);
+  part(muzzleGroup, B(0.18, 0.05, 0.08), MATTE_BLACK, 0, 0.06, 0.08);
+  part(muzzleGroup, B(0.18, 0.05, 0.08), MATTE_BLACK, 0, -0.05, 0.08);
+  // 枪口开口
+  part(muzzleGroup, CYLZ(0.05, 0.05, 0.06, 16), MATTE_BLACK, 0, 0, -0.18);
+
+  // ---- 4. 加长战术护木 ----
+  part(G, B(0.125, 0.10, 0.65), MATTE_BLACK, 0, -0.06, -0.60);
+  for (let i=0; i<6; i++) {
+    part(G, B(0.13, 0.02, 0.04), BLACK_STEEL, 0, -0.06, -0.35 - i*0.09);
+  }
+
+  // ---- 5. 折叠两脚架 ----
+  const bp = new THREE.Group();
+  bp.position.set(0, -0.12, -0.85);
+  G.add(bp);
+  part(bp, B(0.08, 0.04, 0.12), BLACK_METAL, 0, 0, 0);
+  const legL = part(bp, CYLZ(0.018, 0.015, 0.35, 8), BLACK_STEEL, -0.06, -0.12, 0.15);
+  legL.rotation.x = -0.5; legL.rotation.z = -0.35;
+  const legR = part(bp, CYLZ(0.018, 0.015, 0.35, 8), BLACK_STEEL,  0.06, -0.12, 0.15);
+  legR.rotation.x = -0.5; legR.rotation.z =  0.35;
+
+  // ---- 6. 巨型狙击镜 ----
+  const sc = new THREE.Group();
+  sc.position.set(0, 0.16, -0.15); 
+  G.add(sc);
+  part(sc, CYLZ(0.045, 0.045, 0.55, 16), BLACK_METAL, 0, 0, 0);
+  part(sc, CYLZ(0.065, 0.055, 0.22, 16), BLACK_METAL, 0, 0, -0.38);
+  part(sc, CYLZ(0.07, 0.07, 0.05, 16), MATTE_BLACK, 0, 0, -0.50);
+  part(sc, CYLZ(0.058, 0.058, 0.01, 16), OPTIC_GLASS, 0, 0, -0.52); 
+  part(sc, CYLZ(0.05, 0.045, 0.18, 16), BLACK_METAL, 0, 0, 0.35);
+  part(sc, CYLZ(0.045, 0.045, 0.01, 16), OPTIC_GLASS, 0, 0,  0.44); 
+  part(sc, CYL(0.03, 0.03, 0.05, 12), BLACK_STEEL, 0, 0.05, 0);
+  part(sc, CYL(0.03, 0.03, 0.05, 12), BLACK_STEEL, 0.05, 0, 0).rotation.z = PI/2; 
+  part(G, B(0.05, 0.06, 0.05), BLACK_METAL, 0, 0.10, -0.40);
+  part(G, B(0.05, 0.06, 0.05), BLACK_METAL, 0, 0.10,  0.05);
+
+  // ---- 7. 巨型弹匣井与握把 ----
+  part(G, B(0.11, 0.10, 0.25), BLACK_METAL, 0, -0.12, -0.20);
+  const grip = new THREE.Group();
+  grip.position.set(0, -0.12, 0.10);
+  grip.rotation.x = -0.28;
+  G.add(grip);
+  part(grip, B(0.06, 0.18, 0.08), MATTE_BLACK, 0, -0.08, 0);
+  part(grip, B(0.065, 0.02, 0.085), BLACK_STEEL, 0, -0.17, 0);
+  for(let i=0; i<4; i++) part(grip, B(0.062, 0.012, 0.082), BLACK_METAL, 0, -0.05 - i*0.03, 0);
+
+  part(G, B(0.02, 0.05, 0.015), BLACK_STEEL, 0, -0.08, 0.02);
+  part(G, B(0.06, 0.02, 0.10), BLACK_METAL, 0, -0.11, 0.02);
+  part(G, B(0.06, 0.05, 0.015), BLACK_METAL, 0, -0.08, -0.03);
+
+  // ---- 8. 镂空战术骨架枪托 ----
+  const st = new THREE.Group();
+  st.position.set(0, -0.01, 0.32);
+  G.add(st);
+  part(st, CYLZ(0.03, 0.03, 0.15, 12), BLACK_STEEL, 0, 0.01, 0.05); 
+  part(st, B(0.06, 0.04, 0.35), BLACK_METAL, 0, 0.06, 0.20);
+  const lower = part(st, B(0.06, 0.03, 0.30), BLACK_METAL, 0, -0.06, 0.20);
+  lower.rotation.x = 0.08;
+  part(st, B(0.065, 0.16, 0.05), BLACK_METAL, 0, 0.00, 0.38);
+  const cheek = part(st, B(0.07, 0.04, 0.22), MATTE_BLACK, 0, 0.11, 0.18);
+  cheek.rotation.x = -0.05;
+  part(st, B(0.075, 0.18, 0.06), MATTE_BLACK, 0, 0.00, 0.42);
+  part(st, B(0.06, 0.14, 0.015), BLACK_STEEL, 0, 0.00, 0.44); 
+  part(st, B(0.05, 0.08, 0.12), MATTE_BLACK, 0, -0.08, 0.30);
+
+  // ---- 9. 拉机柄 ----
+  const bolt = new THREE.Group();
+  bolt.position.set(0.06, 0.03, 0.15);
+  G.add(bolt);
+  part(bolt, CYLZ(0.018, 0.018, 0.15, 10), BLACK_STEEL, 0, 0, 0);
+  part(bolt, B(0.09, 0.02, 0.02), BLACK_METAL, 0.045, 0, 0.06);
+  part(bolt, new THREE.SphereGeometry(0.02, 8, 8), BLACK_STEEL, 0.09, 0, 0.06);
+
+  const muzzle = new THREE.Object3D(); muzzle.position.set(0, 0.005, -2.15); G.add(muzzle);
+  const eject  = new THREE.Object3D(); eject.position.set(0.08, 0.02, 0.0); G.add(eject);
+
+  // ---- 10. 持枪手部 ----
+  const hands = new THREE.Group(); G.add(hands);
+  const rh = makeHand(false); rh.position.set(0.015, -0.18, 0.15); rh.rotation.set(0.26, 0, 0.10); hands.add(rh);
+  const lh = makeHand(true);  lh.position.set(-0.015, -0.10, -0.55); lh.rotation.set(0.04, 0, -0.16); hands.add(lh);
+
+  return {
+    group: G, muzzle, eject, hands,
+    basePos: new THREE.Vector3(0.26, -0.28, -0.95),
+    baseRot: new THREE.Vector3(-0.02, 0.08, 0.04),
+    adsPos:  new THREE.Vector3(0.0006, -0.155, -0.82),
+    adsRot:  new THREE.Vector3(0, 0, 0),
+    adsRef: 0.82
   };
 }

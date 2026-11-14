@@ -1,7 +1,6 @@
 /* =========================================================================
    grenade.js
    投掷物系统 —— 破片手雷 (frag) + 闪光弹 (flash) + 燃烧瓶 (molotov)
-   已修复：丢失的变量声明、粒子爆炸全面强化、动态光源接入
    ========================================================================= */
 "use strict";
 
@@ -37,100 +36,150 @@ const THROWABLES = {
 const THROWABLE_ORDER = ['frag', 'flash', 'molotov'];
 
 /* =========================================================================
-   模型 —— 手雷
+   模型 —— 破片手雷（M67 拟真版）
    ========================================================================= */
 function buildGrenadeBody(){
   const g = new THREE.Group();
-  const bodyMat = new THREE.MeshStandardMaterial({ color: THROWABLES.frag.color, roughness: 0.72, metalness: 0.18 });
-  const body = new THREE.Mesh(new THREE.SphereGeometry(0.055, 16, 12), bodyMat);
-  body.scale.y = 1.12; body.castShadow = true; g.add(body);
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x3a4a30, roughness: 0.75, metalness: 0.1 });
+  
+  // 胶囊形主弹体
+  const core = new THREE.Mesh(new THREE.CylinderGeometry(0.048, 0.048, 0.06, 16), bodyMat);
+  core.castShadow = true; g.add(core);
+  const topHemi = new THREE.Mesh(new THREE.SphereGeometry(0.048, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), bodyMat);
+  topHemi.position.y = 0.03; topHemi.castShadow = true; g.add(topHemi);
+  const botHemi = new THREE.Mesh(new THREE.SphereGeometry(0.048, 16, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), bodyMat);
+  botHemi.position.y = -0.03; botHemi.castShadow = true; g.add(botHemi);
 
-  const grooveMat = new THREE.MeshStandardMaterial({ color: THROWABLES.frag.trailColor, roughness: 0.80, metalness: 0.10 });
-  for (let i = 0; i < 6; i++){
-    const r = Math.sqrt(Math.max(0.05, 1 - Math.pow((i - 2.5) / 3.2, 2)));
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.054 * r + 0.001, 0.0045, 4, 14), grooveMat);
-    ring.rotation.x = PI / 2; ring.position.y = -0.032 + i * 0.0128; g.add(ring);
+  // 预制破片网格纹理
+  const grooveMat = new THREE.MeshStandardMaterial({ color: 0x1c2418, roughness: 0.85 });
+  for (let i = 0; i < 4; i++) {
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.048, 0.003, 4, 16), grooveMat);
+    ring.rotation.x = Math.PI / 2; ring.position.y = -0.02 + i * 0.013;
+    g.add(ring);
   }
-  const fuzeMat = new THREE.MeshStandardMaterial({ color: 0x222422, roughness: 0.5, metalness: 0.6 });
-  const fuze = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.032, 8), fuzeMat);
-  fuze.position.y = 0.070; fuze.castShadow = true; g.add(fuze);
+  for (let i = 0; i < 8; i++) {
+    const a = i / 8 * Math.PI * 2;
+    const box = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.06, 0.006), grooveMat);
+    box.position.set(Math.cos(a) * 0.046, 0, Math.sin(a) * 0.046);
+    box.rotation.y = -a;
+    g.add(box);
+  }
 
-  const ringMat = new THREE.MeshStandardMaterial({ color: 0xc8c8c8, roughness: 0.28, metalness: 0.85 });
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.024, 0.0038, 6, 14), ringMat);
-  ring.position.set(0, 0.088, 0); ring.rotation.set(0.4, 0.5, 0); g.add(ring);
+  // 引信头
+  const fuzeMat = new THREE.MeshStandardMaterial({ color: 0x444a48, roughness: 0.4, metalness: 0.6 });
+  const fuzeBase = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.015, 12), fuzeMat);
+  fuzeBase.position.y = 0.075; g.add(fuzeBase);
+  const fuzeTop = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.012, 12), fuzeMat);
+  fuzeTop.position.y = 0.085; g.add(fuzeTop);
+  
+  // 拉环
+  const pinMat = new THREE.MeshStandardMaterial({ color: 0x9a9a9a, roughness: 0.3, metalness: 0.8 });
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.018, 0.0025, 8, 16), pinMat);
+  ring.position.set(0.022, 0.082, 0);
+  ring.rotation.set(Math.PI / 2, 0, Math.PI / 2 - 0.4);
+  g.add(ring);
 
-  const lever = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.052, 0.004), ringMat);
-  lever.position.set(0.020, 0.048, 0); lever.rotation.z = 0.15; g.add(lever);
+  // 保险压把 (Safety Lever)
+  const leverMat = new THREE.MeshStandardMaterial({ color: 0x555a58, roughness: 0.5, metalness: 0.4 });
+  const lever = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.08, 0.004), leverMat);
+  lever.position.set(0.014, 0.035, 0.045);
+  lever.rotation.x = 0.15;
+  g.add(lever);
+  const leverBend = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.004, 0.02), leverMat);
+  leverBend.position.set(0.014, -0.003, 0.054);
+  g.add(leverBend);
+
   return g;
 }
 THROWABLES.frag.buildModel = buildGrenadeBody;
 
 /* =========================================================================
-   模型 —— 闪光弹
+   模型 —— 闪光弹（M84 拟真版）
    ========================================================================= */
 function buildFlashbangBody(){
   const g = new THREE.Group();
-  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x6a7a8a, roughness: 0.5, metalness: 0.6 });
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.12, 12), bodyMat);
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x8b9bb4, roughness: 0.35, metalness: 0.65 });
+  const capMat = new THREE.MeshStandardMaterial({ color: 0x2d353c, roughness: 0.4, metalness: 0.7 });
+  
+  // 六边形主壳体
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.11, 6), bodyMat);
   body.castShadow = true; g.add(body);
+  
+  // 顶部和底部盖板
+  const topCap = new THREE.Mesh(new THREE.CylinderGeometry(0.037, 0.036, 0.015, 6), capMat);
+  topCap.position.y = 0.062; topCap.castShadow = true; g.add(topCap);
+  const botCap = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.037, 0.015, 6), capMat);
+  botCap.position.y = -0.062; botCap.castShadow = true; g.add(botCap);
 
-  const holeMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9, metalness: 0.1 });
-  for (let i = 0; i < 4; i++){
-    const hole = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.015, 0.08), holeMat);
-    hole.rotation.y = (i / 4) * PI * 2;
-    hole.position.set(Math.sin(i / 4 * PI * 2) * 0.04, 0, Math.cos(i / 4 * PI * 2) * 0.04);
-    g.add(hole);
+  // 散热孔
+  const holeMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
+  for (let i = 0; i < 6; i++) {
+    const a = i / 6 * Math.PI * 2;
+    const holeT = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.008, 0.012), holeMat);
+    holeT.position.set(Math.cos(a) * 0.034, 0.045, Math.sin(a) * 0.034);
+    holeT.rotation.y = -a;
+    g.add(holeT);
+    const holeB = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.008, 0.012), holeMat);
+    holeB.position.set(Math.cos(a) * 0.034, -0.045, Math.sin(a) * 0.034);
+    holeB.rotation.y = -a;
+    g.add(holeB);
   }
 
-  const capMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.4, metalness: 0.7 });
-  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.048, 0.048, 0.015, 12), capMat);
-  cap.position.y = 0.067; g.add(cap);
-  const cap2 = new THREE.Mesh(new THREE.CylinderGeometry(0.048, 0.048, 0.015, 12), capMat);
-  cap2.position.y = -0.067; g.add(cap2);
-
-  const ringMat = new THREE.MeshStandardMaterial({ color: 0xc8c8c8, roughness: 0.28, metalness: 0.85 });
-  const pin = new THREE.Mesh(new THREE.TorusGeometry(0.02, 0.003, 6, 12), ringMat);
-  pin.position.set(0.03, 0.08, 0); pin.rotation.z = 0.5; g.add(pin);
+  // 引信及拉环
+  const fuze = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.02, 10), capMat);
+  fuze.position.y = 0.078; g.add(fuze);
+  const pinMat = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.3, metalness: 0.8 });
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.015, 0.002, 6, 12), pinMat);
+  ring.position.set(0.018, 0.08, 0); ring.rotation.z = 0.5; g.add(ring);
+  const lever = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.06, 0.004), pinMat);
+  lever.position.set(0.014, 0.04, 0.02); g.add(lever);
 
   return g;
 }
 THROWABLES.flash.buildModel = buildFlashbangBody;
 
 /* =========================================================================
-   模型 —— 燃烧瓶
+   模型 —— 燃烧瓶（精细版）
    ========================================================================= */
 function buildMolotovBody(){
   const g = new THREE.Group();
-  const glassMat = new THREE.MeshStandardMaterial({ color: 0x5a3a20, roughness: 0.30, metalness: 0.08, transparent: true, opacity: 0.88 });
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.055, 0.145, 12), glassMat);
-  body.position.y = 0.0; body.castShadow = true; g.add(body);
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.008, 12), glassMat);
-  base.position.y = -0.076; base.castShadow = true; g.add(base);
+  const glassMat = new THREE.MeshStandardMaterial({ color: 0x6a3a15, roughness: 0.2, metalness: 0.1, transparent: true, opacity: 0.85 });
+  
+  // 瓶身与加厚底座
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 0.15, 16), glassMat);
+  body.castShadow = true; g.add(body);
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.015, 16), glassMat);
+  base.position.y = -0.075; base.castShadow = true; g.add(base);
 
-  const neckMat = new THREE.MeshStandardMaterial({ color: 0x4a2a15, roughness: 0.35, metalness: 0.1, transparent: true, opacity: 0.9 });
-  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.030, 0.075, 10), neckMat);
-  neck.position.y = 0.110; neck.castShadow = true; g.add(neck);
-  const mouth = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.016, 0.014, 10), neckMat);
-  mouth.position.y = 0.155; g.add(mouth);
+  // 瓶颈
+  const neckMat = new THREE.MeshStandardMaterial({ color: 0x4a2510, roughness: 0.3, metalness: 0.05, transparent: true, opacity: 0.9 });
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.035, 0.08, 12), neckMat);
+  neck.position.y = 0.115; neck.castShadow = true; g.add(neck);
+  const lip = new THREE.Mesh(new THREE.TorusGeometry(0.017, 0.003, 6, 12), glassMat);
+  lip.position.y = 0.155; lip.rotation.x = Math.PI / 2; g.add(lip);
 
-  const ragMat = new THREE.MeshStandardMaterial({ color: 0xe8d9b0, roughness: 0.92 });
-  const rag = new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.016, 0.055, 6), ragMat);
-  rag.position.set(0.004, 0.192, 0); rag.rotation.z = 0.28; rag.castShadow = true; g.add(rag);
+  // 内部液体
+  const liquidMat = new THREE.MeshStandardMaterial({ color: 0xb83a10, roughness: 0.1, transparent: true, opacity: 0.6 });
+  const liquid = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 0.10, 12), liquidMat);
+  liquid.position.y = -0.01; g.add(liquid);
 
-  const liquidMat = new THREE.MeshStandardMaterial({ color: 0xc85a20, roughness: 0.4, metalness: 0.05, transparent: true, opacity: 0.55 });
-  const liquid = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.048, 0.10, 10), liquidMat);
-  liquid.position.y = -0.012; g.add(liquid);
+  // 碎布与绑带
+  const ragMat = new THREE.MeshStandardMaterial({ color: 0xd0c090, roughness: 0.95 });
+  const rag = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.018, 0.06, 6), ragMat);
+  rag.position.set(0.002, 0.19, 0); rag.rotation.z = 0.15; rag.castShadow = true; g.add(rag);
+  const rag2 = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.012, 0.05, 5), ragMat);
+  rag2.position.set(-0.008, 0.185, 0.008); rag2.rotation.set(0.2, 0, -0.3); rag2.castShadow = true; g.add(rag2);
+  
+  const stringMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.8 });
+  const string = new THREE.Mesh(new THREE.TorusGeometry(0.017, 0.002, 4, 10), stringMat);
+  string.position.y = 0.165; string.rotation.x = Math.PI / 2; g.add(string);
 
-  const flameMat = new THREE.MeshBasicMaterial({ color: 0xffa040, transparent: true, opacity: 0.85, depthWrite: false });
-  const flame = new THREE.Mesh(new THREE.SphereGeometry(0.013, 8, 6), flameMat);
-  flame.position.set(0.010, 0.222, 0); flame.scale.y = 1.6; g.add(flame);
-  g.userData.flame = flame;
   return g;
 }
 THROWABLES.molotov.buildModel = buildMolotovBody;
 
 /* =========================================================================
-   第一人称手持
+   第一人称手持构建
    ========================================================================= */
 let grenadeHandRoot = null;
 let grenadeHandSway = null;
@@ -160,8 +209,10 @@ function _rebuildHandModel(kind){
   }
   const def = THROWABLES[kind];
   grenadeHandModel = def.buildModel ? def.buildModel() : buildGrenadeBody();
-  grenadeHandModel.position.set(-0.008, 0.030, -0.02);
-  grenadeHandModel.rotation.set(0.9, 0.4, 0.1);
+  
+  // ★ 优化：让手雷被“握住”而不是平躺在手里。X轴微调让它立起来。
+  grenadeHandModel.position.set(0, -0.015, -0.03);
+  grenadeHandModel.rotation.set(-0.2, 0, 0); 
   grenadeHandModel.scale.setScalar(1.05);
   grenadeHandSway.add(grenadeHandModel);
 }
@@ -171,10 +222,13 @@ function _rebuildHandModel(kind){
    ========================================================================= */
 const grenades = [];
 const fireZones = [];
-let grenadeState = { active: false, kind: 'frag', prevWeapon: 0, charging: false, chargeT: 0, fuse: 0, invCount: {} };
+let grenadeState = { 
+  active: false, kind: 'frag', prevWeapon: 0, 
+  charging: false, chargeT: 0, fuse: 0, invCount: {},
+  throwing: false, throwT: 0, didSpawn: false, throwChargeK: 0, throwAlreadyFused: 0 // ★ 新增存储捏雷时间
+};
 for (const k in THROWABLES) grenadeState.invCount[k] = THROWABLES[k].count || 1;
 
-/* ★ 全局 ID 与对象池 ★ */
 let _grenadeIdCounter = 0;
 const _grenadePool = Object.create(null);
 
@@ -262,6 +316,8 @@ function _equipThrowable(kind, fromGun){
   grenadeState.active = true;
   grenadeState.kind = kind;
   grenadeState.charging = false;
+  grenadeState.throwing = false; // ★ 重置投掷状态
+  grenadeState.didSpawn = false; // ★ 重置
   grenadeState.chargeT = 0;
   grenadeState.fuse = 0;
   ensureGrenadeHand();
@@ -282,6 +338,8 @@ function _equipThrowable(kind, fromGun){
 function _unequipThrowable(){
   grenadeState.active = false;
   grenadeState.charging = false;
+  grenadeState.throwing = false; // ★ 重置投掷状态
+  grenadeState.didSpawn = false; // ★ 重置
   grenadeState.chargeT = 0;
   grenadeState.fuse = 0;
   if (grenadeHandRoot) grenadeHandRoot.visible = false;
@@ -309,7 +367,7 @@ document.addEventListener('click', (ev) => {
 }, true);
 
 function throwGrenade(){
-  if (!grenadeState.active || !grenadeState.charging) return;
+  if (!grenadeState.active || !grenadeState.charging || grenadeState.throwing) return;
   const kind = grenadeState.kind;
   const def = THROWABLES[kind];
   if ((grenadeState.invCount[kind] || 0) <= 0){
@@ -318,20 +376,21 @@ function throwGrenade(){
     else _unequipThrowable();
     return;
   }
-  const chargeK = clamp(grenadeState.chargeT / def.chargeTime, 0, 1);
-  const speed = lerp(def.throwSpeedMin, def.throwSpeedMax, chargeK);
-  camera.getWorldDirection(_gFwd);
-  _gRgt.crossVectors(_gFwd, _gUp).normalize();
-  const upv = _gTmp.crossVectors(_gRgt, _gFwd).normalize();
-  const origin = camera.position.clone().addScaledVector(_gFwd, 0.35).addScaledVector(_gRgt, 0.14).addScaledVector(upv, -0.05);
-  const vel = _gFwd.clone().multiplyScalar(speed);
-  vel.y += speed * def.throwLift;
-  _spawnGrenade(kind, origin, vel, grenadeState.fuse);
-  grenadeState.invCount[kind] = Math.max(0, grenadeState.invCount[kind] - 1);
-  grenadeState.charging = false; grenadeState.chargeT = 0; grenadeState.fuse = 0;
-  if (grenadeState.invCount[kind] > 0){ if (typeof updateAmmoUI === 'function') updateAmmoUI(); }
-  else { const next = _nextKindAfter(kind); if (next) _equipThrowable(next, false); else _unequipThrowable(); }
-  SFX.pumpSound(false);
+  
+  // ★ 不再立刻生成手雷，而是触发投掷动作
+  grenadeState.throwing = true;
+  grenadeState.throwT = 0;
+  grenadeState.didSpawn = false;
+  grenadeState.charging = false;
+  
+  // 记录松手时的力度，防止动画期间转视角导致飞出角度不合理
+  grenadeState.throwChargeK = clamp(grenadeState.chargeT / def.chargeTime, 0, 1);
+  
+  // ★ 保存当前已捏的秒数，供生成实体时扣除
+  grenadeState.throwAlreadyFused = grenadeState.fuse; 
+  
+  grenadeState.chargeT = 0; 
+  grenadeState.fuse = 0;
 }
 
 function _spawnGrenade(kind, origin, vel, alreadyFused){
@@ -658,27 +717,23 @@ function spawnExplosionRing(pos, r0, r1, opts){
 }
 
 /* =========================================================================
-   ★★★ 引爆逻辑（超级加强版） ★★★
+   ★★★ 引爆逻辑 ★★★
    ========================================================================= */
 function _flashExplode(g){
-  /* 1. 纯白核心爆闪 */
   for (let i = 0; i < 48; i++){
     const v = new THREE.Vector3(rand(-1, 1), rand(-1, 1), rand(-1, 1)).normalize().multiplyScalar(rand(12, 28));
     spawnParticle(PS_SPARK, g.pos.x, g.pos.y, g.pos.z, v.x, v.y, v.z,
       { color: [1.0, 1.0, 1.0], size: rand(0.20, 0.42), grow: 1.8, life: rand(0.08, 0.20), drag: 5.0, grav: 0, alpha: 1.0 });
   }
-  /* 2. 径向放射光柱 */
   for (let i = 0; i < 24; i++){
     const a = Math.random() * PI * 2, el = rand(-0.5, 0.5);
     const dir = new THREE.Vector3(Math.cos(a) * Math.cos(el), Math.sin(el), Math.sin(a) * Math.cos(el));
     spawnParticle(PS_SPARK, g.pos.x, g.pos.y, g.pos.z, dir.x * 32, dir.y * 32, dir.z * 32,
       { color: [1.0, 1.0, 1.0], size: rand(0.04, 0.08), life: rand(0.15, 0.32), drag: 0.2, grav: 0, alpha: 0.95 });
   }
-  /* 3. 光晕冲击波 */
   spawnExplosionRing(g.pos, 0.2, 15.0, { color: 0xffffff, dur: 0.28, thick: 0.10, ease: 3 });
   spawnExplosionRing(g.pos, 0.4, 20.0, { color: 0xbfe0ff, dur: 0.55, thick: 0.06, ease: 1 });
   
-  /* 4. 动态光源 + FOV冲击 */
   triggerExplosionLight(g.pos, 0xffffff, 15, 0.25);
   player.fovKick = Math.min(6.0, player.fovKick + 2.0);
 
@@ -697,41 +752,34 @@ function _grenadeExplode(g){
   const airborne = !g.grounded;
   const px = g.pos.x, py = g.pos.y, pz = g.pos.z;
 
-  /* L0：白光核心 */
   for (let i = 0; i < 34; i++){
     const v = new THREE.Vector3(rand(-1, 1), rand(-0.2, 1.2), rand(-1, 1)).normalize().multiplyScalar(rand(10, 22));
     spawnParticle(PS_SPARK, px, py, pz, v.x, v.y, v.z, { color: [1.0, 1.0, 1.0], size: rand(0.20, 0.32), life: rand(0.05, 0.12), drag: 6.0, grav: 0, grow: 1.5, alpha: 1.0 });
   }
-  /* L1：热核 */
   for (let i = 0; i < 36; i++){
     const v = new THREE.Vector3(rand(-1, 1), rand(-0.1, 1.3), rand(-1, 1)).normalize().multiplyScalar(rand(5, 14));
     spawnParticle(PS_SPARK, px, py, pz, v.x, v.y, v.z, { color: [1.0, 0.94, 0.55], size: rand(0.16, 0.30), grow: 1.2, life: rand(0.14, 0.30), drag: 3.0, grav: 0.5, alpha: 1.0 });
   }
-  /* L2：橙红主火球 */
   for (let i = 0; i < 56; i++){
     const v = new THREE.Vector3(rand(-1, 1), rand(-0.1, 1.3), rand(-1, 1)).normalize().multiplyScalar(rand(4, 13));
     const warm = Math.random();
     const col = warm < 0.22 ? [1.0, 0.72, 0.25] : warm < 0.48 ? [1.0, 0.55, 0.12] : warm < 0.74 ? [1.0, 0.38, 0.06] : warm < 0.90 ? [0.88, 0.24, 0.04] : [0.70, 0.14, 0.02];
     spawnParticle(PS_SPARK, px, py, pz, v.x, v.y, v.z, { color: col, size: rand(0.22, 0.42), grow: 1.6, life: rand(0.35, 0.90), drag: 1.8, grav: 1.5, alpha: 0.95 });
   }
-  /* L3：高速碎片（带重力抛物线） */
   for (let i = 0; i < 42; i++){
     const v = new THREE.Vector3(rand(-1, 1), rand(0.4, 1.5), rand(-1, 1)).normalize().multiplyScalar(rand(16, 32));
     spawnParticle(PS_SPARK, px, py, pz, v.x, v.y, v.z, { color: i < 20 ? [1.0, 0.95, 0.65] : [1.0, 0.55, 0.15], size: rand(0.03, 0.09), life: rand(0.6, 1.3), drag: 0.4, grav: -26, alpha: 1.0 });
   }
-  /* L4：浓烟 */
   for (let i = 0; i < 36; i++){
     const v = new THREE.Vector3(rand(-0.8, 0.8), rand(0.5, 1.5), rand(-0.8, 0.8)).normalize().multiplyScalar(rand(1.5, 5));
     const dark = Math.random() < 0.6;
     spawnParticle(PS_SOFT, px, py + 0.2, pz, v.x, v.y, v.z, { color: dark ? [0.14, 0.13, 0.12] : [0.35, 0.32, 0.28], size: rand(0.35, 0.65), grow: 1.5, life: rand(1.5, 3.2), drag: 1.1, grav: 0.5, alpha: 0.75 });
   }
-  /* L5：地面扩散气浪 */
   for (let i = 0; i < 22; i++){
     const a = Math.random() * PI * 2;
     const v = new THREE.Vector3(Math.cos(a), rand(0.1, 0.5), Math.sin(a)).multiplyScalar(rand(5, 11));
     spawnParticle(PS_SOFT, px, py + 0.08, pz, v.x, v.y, v.z, { color: [0.42, 0.38, 0.32], size: rand(0.30, 0.52), grow: 2.0, life: rand(0.8, 1.7), drag: 1.4, grav: 0.3, alpha: 0.55 });
   }
-  /* L6：二次爆燃 */
   setTimeout(() => {
     const offX = rand(-0.4, 0.4), offZ = rand(-0.4, 0.4);
     for (let i = 0; i < 14; i++){
@@ -740,13 +788,11 @@ function _grenadeExplode(g){
     }
   }, 120);
 
-  /* 冲击波环 */
   spawnExplosionRing(g.pos, 0.2, def.dmgRadius * 1.55, { color: 0xffffff, dur: 0.20, thick: 0.06, ease: 3 });
   spawnExplosionRing(g.pos, 0.5, def.dmgRadius * 1.10, { color: 0xff8020, dur: 0.58, thick: 0.24, ease: 2 });
   spawnExplosionRing(g.pos, 0.6, def.dmgRadius * 0.88, { color: 0xb02000, dur: 0.90, thick: 0.30, ease: 1 });
   spawnExplosionRing(g.pos, 0.8, def.dmgRadius * 1.85, { color: 0x803010, dur: 1.30, thick: 0.10, ease: 1 });
 
-  /* 光源与屏幕冲击 */
   triggerExplosionLight(g.pos, 0xffaa55, 25, 0.4);
   const dist = g.pos.distanceTo(camera.position);
   const shakeD = clamp(1 - dist / 30, 0, 1);
@@ -869,8 +915,70 @@ function updateGrenades(dt){
     }
   }
 
-  /* 玩家手持 */
-  if (grenadeState.active && grenadeState.charging){
+  /* ★ 处理投掷动作和延迟生成手雷 */
+  if (grenadeState.throwing) {
+    grenadeState.throwT += dt;
+    const totalT = 0.45; // 动作总时长
+    const t = grenadeState.throwT / totalT; // 0 到 1
+    
+    if (grenadeHandSway) {
+      // 动作拆解：后拉 -> 前挥 -> 收回
+      if (t < 0.25) {
+        const k = easeOutCubic(t / 0.25);
+        grenadeHandSway.position.set(0.20, -0.22 - 0.15 * k, -0.72 + 0.2 * k);
+        grenadeHandSway.rotation.set(-0.05 + 0.3 * k, 0.18, 0.06);
+      } else if (t < 0.55) {
+        const k = easeOutCubic((t - 0.25) / 0.3);
+        grenadeHandSway.position.set(0.20 - 0.22 * k, -0.37 + 0.35 * k, -0.52 - 0.3 * k);
+        grenadeHandSway.rotation.set(0.25 - 1.0 * k, 0.18, 0.06);
+      } else {
+        const k = easeOutCubic((t - 0.55) / 0.45);
+        grenadeHandSway.position.set(-0.02 + 0.22 * k, -0.02 - 0.20 * k, -0.82 + 0.1 * k);
+        grenadeHandSway.rotation.set(-0.75 + 0.7 * k, 0.18, 0.06);
+      }
+    }
+
+    // ★ 手雷飞出的瞬间 (约 55% 进度时)
+    if (t >= 0.55 && !grenadeState.didSpawn) {
+      grenadeState.didSpawn = true;
+      const kind = grenadeState.kind;
+      const def = THROWABLES[kind];
+      const speed = lerp(def.throwSpeedMin, def.throwSpeedMax, grenadeState.throwChargeK);
+      
+      camera.getWorldDirection(_gFwd);
+      _gRgt.crossVectors(_gFwd, _gUp).normalize();
+      const upv = _gTmp.crossVectors(_gRgt, _gFwd).normalize();
+      
+      const origin = camera.position.clone().addScaledVector(_gFwd, 0.35).addScaledVector(_gRgt, 0.14).addScaledVector(upv, -0.15);
+const vel = _gFwd.clone().multiplyScalar(speed);
+vel.y += speed * def.throwLift;
+
+// ★ 传入之前保存的捏雷时间（0 就是没捏，捏了 2 秒就是 2）
+_spawnGrenade(kind, origin, vel, grenadeState.throwAlreadyFused);
+      
+      grenadeState.invCount[kind] = Math.max(0, grenadeState.invCount[kind] - 1);
+      if (typeof updateAmmoUI === 'function') updateAmmoUI();
+      SFX.pumpSound(false);
+    }
+
+    // 动作结束，重置状态
+    if (t >= 1.0) {
+      grenadeState.throwing = false;
+      grenadeState.didSpawn = false;
+      const kind = grenadeState.kind;
+      
+      if (grenadeState.invCount[kind] <= 0) {
+        const next = _nextKindAfter(kind);
+        if (next) _equipThrowable(next, false);
+        else _unequipThrowable();
+      } else {
+        if (grenadeHandSway) {
+          grenadeHandSway.position.set(0.20, -0.22, -0.72);
+          grenadeHandSway.rotation.set(-0.05, 0.18, 0.06);
+        }
+      }
+    }
+  } else if (grenadeState.active && grenadeState.charging) {
     grenadeState.chargeT += dt;
     const def = THROWABLES[grenadeState.kind];
     if (def.canCook){
@@ -945,6 +1053,7 @@ function _detonateInHand(){
 
   grenadeState.invCount[kind] = Math.max(0, (grenadeState.invCount[kind] || 0) - 1);
   grenadeState.charging = false;
+  grenadeState.throwing = false;
   grenadeState.chargeT = 0;
   grenadeState.fuse = 0;
 
@@ -995,6 +1104,9 @@ function resetThrowables(){
   grenadeState.kind = 'frag';
   grenadeState.prevWeapon = 0;
   grenadeState.charging = false;
+  grenadeState.throwT = 0;
+  grenadeState.throwing = false;
+  grenadeState.didSpawn = false;
   grenadeState.chargeT = 0;
   grenadeState.fuse = 0;
 

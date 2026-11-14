@@ -444,81 +444,122 @@ function buildEnemyModel(emOpt){
   buildComms(head);
 
   /* ---- 手臂 + 手 ---- */
-  const rig = new THREE.Group();
-  rig.position.set(0, 1.40, 0);
-  body.add(rig);
-  const arms = [];
-  for (const s of [-1, 1]){
-    const sh = new THREE.Group();
-    sh.position.set(s * 0.275, 0.02, 0);
-    rig.add(sh);
-    part(sh, B(0.150, 0.135, 0.165), E_MAT.vest, 0, -0.035, 0);              // 肩甲
-    part(sh, EB(0.135, 0.34, 0.145), E_MAT.cloth, 0, -0.17, 0);
-    part(sh, B(0.140, 0.075, 0.150), E_MAT.vest, 0, -0.30, 0);              // 肘垫
+const rig = new THREE.Group();
+rig.position.set(0, 1.40, 0);
+body.add(rig);
+const arms = [];
+for (const s of [-1, 1]){
+  const sh = new THREE.Group();
+  sh.position.set(s * 0.275, 0.02, 0);
+  rig.add(sh);
+  part(sh, B(0.150, 0.135, 0.165), E_MAT.vest, 0, -0.035, 0);              // 肩甲
+  part(sh, EB(0.135, 0.34, 0.145), E_MAT.cloth, 0, -0.17, 0);
+  part(sh, B(0.140, 0.075, 0.150), E_MAT.vest, 0, -0.30, 0);              // 肘垫
+  part(sh, B(0.040, 0.024, 0.016), E_MAT.buckle, 0, -0.005, -0.080);      // 肩带扣具
 
-    /* ★ 肩甲的肩带扣具 */
-    part(sh, B(0.040, 0.024, 0.016), E_MAT.buckle, 0, -0.005, -0.080);
+  const el = new THREE.Group();
+  el.position.set(0, -0.34, 0);
+  sh.add(el);
+  part(el, EB(0.115, 0.30, 0.125), E_MAT.cloth, 0, -0.15, 0);
+  part(el, B(0.128, 0.155, 0.138), E_MAT.vest, 0, -0.14, 0);              // 战术护臂
+  part(el, B(0.135, 0.012, 0.145), E_MAT.strap, 0, -0.09, 0);
+  part(el, B(0.135, 0.012, 0.145), E_MAT.strap, 0, -0.19, 0);
 
-    const el = new THREE.Group();
-    el.position.set(0, -0.34, 0);
-    sh.add(el);
-    part(el, EB(0.115, 0.30, 0.125), E_MAT.cloth, 0, -0.15, 0);
-    /* ★ 前臂护具（战术护臂）*/
-    part(el, B(0.128, 0.155, 0.138), E_MAT.vest, 0, -0.14, 0);
-    /* 护臂上的绑带 */
-    part(el, B(0.135, 0.012, 0.145), E_MAT.strap, 0, -0.09, 0);
-    part(el, B(0.135, 0.012, 0.145), E_MAT.strap, 0, -0.19, 0);
+  // 手部手套
+  const hand = buildHand(el, s, 0.85);
+  hand.position.set(0, -0.30, 0.010);
+  arms.push({ sh, el });
+}
 
-    /* ★ 手部：用五指模型代替原来的盒子 */
-    const hand = buildHand(el, s, 0.85);   // 战斗握拳姿态
-    hand.position.set(0, -0.30, 0.010);
+/* ---- 武器精细化 ---- */
+const gun = new THREE.Group();
+rig.add(gun);
 
-    arms.push({ sh, el });
-  }
+// 1. 机匣与护木
+part(gun, B(0.065, 0.085, 0.34), E_MAT.gun, 0, 0, -0.10); // 上机匣
+part(gun, B(0.058, 0.078, 0.28), E_MAT.dark, 0, -0.01, -0.38); // 护木
+for (let i = 0; i < 4; i++) {
+  part(gun, B(0.062, 0.012, 0.04), E_MAT.gun, 0, 0.042, -0.28 - i * 0.06); // 顶部导轨
+}
 
-  /* ---- 武器 ---- */
-  const gun = new THREE.Group();
-  rig.add(gun);
-  part(gun, B(0.065, 0.085, 0.34), E_MAT.gun, 0, 0, -0.10);
-  part(gun, CYLZ(0.016, 0.016, 0.32, 8), E_MAT.gun, 0, 0.006, -0.40);
-  part(gun, B(0.045, 0.14, 0.07), E_MAT.gun, 0, -0.10, -0.05);
-  part(gun, B(0.05, 0.10, 0.06), E_MAT.gun, 0, -0.075, 0.05);
-  part(gun, B(0.055, 0.075, 0.16), E_MAT.gun, 0, -0.005, 0.16);
+// 2. 枪管与消焰器
+part(gun, CYLZ(0.012, 0.012, 0.32, 8), E_MAT.gun, 0, 0.006, -0.48);
+part(gun, CYLZ(0.020, 0.018, 0.06, 8), E_MAT.dark, 0, 0.006, -0.65); // 消焰器
 
-  const gunMuzzle = new THREE.Object3D();
-  gunMuzzle.position.set(0, 0.006, -0.56);
-  gun.add(gunMuzzle);
+// 3. 弹匣与握把
+part(gun, B(0.045, 0.14, 0.075), E_MAT.dark, 0, -0.10, -0.05); // 弹匣
+const grp = new THREE.Group();
+grp.position.set(0, -0.075, 0.05);
+grp.rotation.x = -0.3;
+gun.add(grp);
+part(grp, B(0.045, 0.11, 0.06), E_MAT.dark, 0, -0.05, 0); // 握把
 
-  const k = (opt && opt.kind) || 'rifle';
+// 4. 枪托
+part(gun, B(0.055, 0.075, 0.16), E_MAT.gun, 0, -0.005, 0.16);
+part(gun, B(0.06, 0.10, 0.03), E_MAT.dark, 0, -0.01, 0.24); // 托底板
+
+// 5. 战术瞄具 (红点/全息)
+part(gun, B(0.03, 0.04, 0.08), E_MAT.dark, 0, 0.06, -0.05); // 瞄具底座
+part(gun, CYLZ(0.025, 0.025, 0.10, 8), E_MAT.gun, 0, 0.09, -0.05); // 镜筒
+part(gun, B(0.01, 0.03, 0.01), E_MAT.dark, 0, 0.08, -0.02); // 支架
+
+const gunMuzzle = new THREE.Object3D();
+gunMuzzle.position.set(0, 0.006, -0.70);
+gun.add(gunMuzzle);
+
+const k = (opt && opt.kind) || 'rifle';
 
   if (k === 'sniper'){
-    gun.children.forEach(m => { m.visible = false; });
-    part(gun, B(0.058, 0.082, 0.62), E_MAT.gun, 0, 0, -0.22);
-    part(gun, CYLZ(0.013, 0.013, 0.72, 8), E_MAT.gun, 0, 0.004, -0.62);
-    part(gun, CYLZ(0.030, 0.030, 0.10, 8), E_MAT.gun, 0, 0.004, -0.98);      // 制退器
-    part(gun, CYLZ(0.038, 0.038, 0.30, 10), E_MAT.gun, 0, 0.088, -0.18);     // 瞄准镜
-    part(gun, CYLZ(0.048, 0.048, 0.06, 10), E_MAT.glass, 0, 0.088, -0.33);   // 物镜
-    part(gun, B(0.05, 0.11, 0.06), E_MAT.gun, 0, -0.09, -0.02);
-    part(gun, B(0.05, 0.09, 0.20), E_MAT.gun, 0, -0.01, 0.18);
-    gunMuzzle.position.set(0, 0.004, -1.02);
-  } else if (k === 'flamer'){
-    gun.children.forEach(m => { m.visible = false; });
-    part(gun, B(0.075, 0.10, 0.40), E_MAT.gun, 0, 0, -0.12);                 // 喷枪体
-    part(gun, CYLZ(0.028, 0.028, 0.34, 8), E_MAT.gun, 0, 0.004, -0.44);      // 喷嘴
-    part(gun, CYLZ(0.046, 0.046, 0.07, 8), E_MAT.dark, 0, 0.004, -0.62);     // 点火罩
-    part(gun, CYL(0.105, 0.105, 0.30, 12), E_MAT.vest, 0.02, -0.16, 0.10);   // 燃料罐 L
-    part(gun, CYL(0.105, 0.105, 0.30, 12), E_MAT.vest, -0.02, -0.16, 0.10);  // 燃料罐 R
-    part(gun, B(0.045, 0.11, 0.06), E_MAT.gun, 0, -0.10, -0.02);
-    gunMuzzle.position.set(0, 0.004, -0.66);
-  } else if (k === 'rusher'){
-    gun.children.forEach(m => { m.visible = false; });
-    part(gun, B(0.070, 0.095, 0.30), E_MAT.gun, 0, 0, -0.10);
-    part(gun, CYLZ(0.026, 0.026, 0.26, 8), E_MAT.gun, 0, 0.004, -0.36);
-    part(gun, CYLZ(0.030, 0.030, 0.14, 8), E_MAT.dark, 0, -0.052, -0.30);    // 管状弹匣
-    part(gun, B(0.048, 0.12, 0.06), E_MAT.gun, 0, -0.09, -0.02);
-    part(gun, B(0.05, 0.09, 0.14), E_MAT.gun, 0, -0.01, 0.14);
-    gunMuzzle.position.set(0, 0.004, -0.50);
-  }
+  gun.children.forEach(m => { m.visible = false; });
+  // 修长枪身
+  part(gun, B(0.058, 0.082, 0.62), E_MAT.gun, 0, 0, -0.22);
+  part(gun, CYLZ(0.013, 0.013, 0.75, 8), E_MAT.dark, 0, 0.004, -0.65);
+  part(gun, CYLZ(0.032, 0.025, 0.12, 8), E_MAT.gun, 0, 0.004, -1.02); // 大型制退器
+  
+  // 高倍狙击镜
+  part(gun, B(0.03, 0.06, 0.04), E_MAT.dark, 0, 0.06, -0.18); // 前支架
+  part(gun, B(0.03, 0.06, 0.04), E_MAT.dark, 0, 0.06, 0.05);  // 后支架
+  part(gun, CYLZ(0.035, 0.035, 0.35, 10), E_MAT.gun, 0, 0.10, -0.05); // 主镜筒
+  part(gun, CYLZ(0.045, 0.040, 0.08, 10), E_MAT.gun, 0, 0.10, -0.26); // 物镜外罩
+  part(gun, CYLZ(0.050, 0.050, 0.02, 10), E_MAT.dark, 0, 0.10, -0.31); // 遮光罩
+  part(gun, CYLZ(0.020, 0.020, 0.02, 10), E_MAT.glass, 0, 0.10, -0.315); // 镜片
+  part(gun, CYLZ(0.015, 0.015, 0.03, 8), E_MAT.dark, 0, 0.135, -0.05); // 调节旋钮
+  
+  // 枪托与握把
+  part(gun, B(0.05, 0.11, 0.06), E_MAT.dark, 0, -0.09, -0.02);
+  part(gun, B(0.05, 0.09, 0.24), E_MAT.gun, 0, -0.01, 0.20);
+  part(gun, B(0.05, 0.06, 0.06), E_MAT.dark, 0, 0.04, 0.25); // 托腮板
+  gunMuzzle.position.set(0, 0.004, -1.08);
+  
+} else if (k === 'flamer'){
+  gun.children.forEach(m => { m.visible = false; });
+  // 喷火枪主体
+  part(gun, B(0.075, 0.10, 0.40), E_MAT.gun, 0, 0, -0.12);
+  part(gun, CYLZ(0.032, 0.028, 0.34, 8), E_MAT.dark, 0, 0.004, -0.44); // 喷嘴
+  part(gun, CYLZ(0.050, 0.050, 0.08, 8), E_MAT.gun, 0, 0.004, -0.62);  // 点火罩
+  part(gun, B(0.02, 0.02, 0.06), E_MAT.accent, 0, 0.05, -0.58); // 点火针
+  // 双燃料罐
+  part(gun, CYL(0.105, 0.105, 0.30, 12), E_MAT.vest, 0.02, -0.16, 0.10);
+  part(gun, CYL(0.105, 0.105, 0.30, 12), E_MAT.vest, -0.02, -0.16, 0.10);
+  // 软管
+  part(gun, CYLZ(0.015, 0.015, 0.25, 6), E_MAT.dark, 0.02, -0.10, -0.10, 0.2, 0.5, 0);
+  
+  part(gun, B(0.045, 0.11, 0.06), E_MAT.dark, 0, -0.10, -0.02);
+  gunMuzzle.position.set(0, 0.004, -0.66);
+  
+} else if (k === 'rusher'){
+  gun.children.forEach(m => { m.visible = false; });
+  // 战术霰弹枪/冲锋枪
+  part(gun, B(0.070, 0.095, 0.30), E_MAT.gun, 0, 0, -0.10); // 机匣
+  part(gun, CYLZ(0.026, 0.026, 0.26, 8), E_MAT.dark, 0, 0.004, -0.36); // 枪管
+  part(gun, CYLZ(0.030, 0.030, 0.16, 8), E_MAT.gun, 0, -0.052, -0.30); // 管状弹匣
+  part(gun, B(0.05, 0.03, 0.18), E_MAT.dark, 0, 0.05, -0.15); // 顶部导轨
+  part(gun, B(0.02, 0.03, 0.04), E_MAT.accent, 0, 0.07, -0.05); // 简易红点
+  
+  part(gun, B(0.048, 0.12, 0.06), E_MAT.dark, 0, -0.09, -0.02); // 握把
+  part(gun, B(0.05, 0.09, 0.14), E_MAT.gun, 0, -0.01, 0.14); // 枪托
+  gunMuzzle.position.set(0, 0.004, -0.52);
+}
 
   const gasMuzzle = new THREE.Object3D();
   gasMuzzle.position.copy(gunMuzzle.position);

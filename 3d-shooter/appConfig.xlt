@@ -1,11 +1,11 @@
 {
-	"appName": "3D射击1.3Beta",
+	"appName": "3D射击1.4Beta",
 	"appPackageName": "top.webcat.xappcc",
-	"appVersionName": "1.3Beta",
+	"appVersionName": "1.4Beta",
 	"appVersionCode": 100000,
 	"data": {		
 		"启用顶栏": true,
-		"顶栏标题": "3D射击1.3Beta",
+		"顶栏标题": "3D射击1.4Beta",
 		"顶栏颜色": "#FF2C2E43",
 		"横屏": false,
 		"显示状态栏": true,

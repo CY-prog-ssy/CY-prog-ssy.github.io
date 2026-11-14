@@ -1,6 +1,5 @@
 /* =========================================================================
    input.js
-   键盘 / 鼠标 / 触屏输入 + 全屏 + 横屏锁定
    ========================================================================= */
 "use strict";
 
@@ -13,12 +12,6 @@ let sensScale = 1;
 
 const IS_TOUCH = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 
-/* --------------------------------------------------------------------------
-   ★ 键位映射
-   DEFAULT_KEYBINDS 是初始值；KEYBINDS 由 settings.js 在加载后赋值为
-   SET.keybinds（同一引用）。用户修改键位时 SET.keybinds 被改写，
-   下一次 keydown 立即生效，无需刷新。
-   -------------------------------------------------------------------------- */
 const DEFAULT_KEYBINDS = {
   forward:  ['KeyW', 'ArrowUp'],
   back:     ['KeyS', 'ArrowDown'],
@@ -41,7 +34,6 @@ const DEFAULT_KEYBINDS = {
   pause:    ['Escape']
 };
 
-/* settings.js 加载后 = SET.keybinds（同一引用） */
 let KEYBINDS = null;
 
 function isBoundCode(code, action){
@@ -60,9 +52,6 @@ function isActionDown(action){
   return false;
 }
 
-/* --------------------------------------------------------------------------
-   横屏锁定 / 全屏
-   -------------------------------------------------------------------------- */
 function tryLockLandscape(){
   if (screen.orientation && typeof screen.orientation.lock === 'function'){
     screen.orientation.lock('landscape').catch(() => {});
@@ -119,9 +108,6 @@ if (IS_TOUCH){
   }, { passive: true });
 }
 
-/* =========================================================================
-   键盘
-   ========================================================================= */
 addEventListener('keydown', e => {
   if (e.repeat){
     if (isBoundCode(e.code, 'jump') || isBoundCode(e.code, 'reload')) e.preventDefault();
@@ -130,10 +116,8 @@ addEventListener('keydown', e => {
 
   keys[e.code] = true;
 
-  /* ★ 跳跃的边沿触发：任何绑定到 jump 的键都会置位 */
   if (isBoundCode(e.code, 'jump')) player.spaceEdge = true;
 
-  /* 阻止系统级滚动 / 光标移动 */
   const PREVENT = ['Space','Tab','Enter','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','ControlLeft'];
   if (PREVENT.includes(e.code)) e.preventDefault();
 
@@ -188,9 +172,6 @@ addEventListener('keydown', e => {
 
 addEventListener('keyup', e => { keys[e.code] = false; });
 
-/* =========================================================================
-   鼠标
-   ========================================================================= */
 addEventListener('mousemove', e => {
   if (document.pointerLockElement !== document.body){
     if (G.needLock) grabLock();
@@ -204,7 +185,6 @@ addEventListener('mousedown', e => {
   if (G.shopOpen) return;
   if (G.needLock) grabLock();
 
-  /* 投掷物模式：左键捏雷 */
   if (e.button === 0 && typeof grenadeState !== 'undefined' && grenadeState.active){
     grenadeState.charging = true;
     grenadeState.chargeT = 0;
@@ -240,7 +220,6 @@ addEventListener('mousedown', e => {
 
 addEventListener('mouseup', e => {
   if (e.button === 0){
-    /* 投掷物模式：松开丢出去 */
     if (typeof grenadeState !== 'undefined' && grenadeState.active && grenadeState.charging){
       if (typeof throwGrenade === 'function') throwGrenade();
       return;
@@ -322,9 +301,6 @@ function pauseGameTouch(){
   SFX.suspend();
 }
 
-/* =========================================================================
-   触屏
-   ========================================================================= */
 if (IS_TOUCH){
   document.body.classList.add('touch');
 
@@ -357,9 +333,9 @@ if (IS_TOUCH){
   }
 
   window.addEventListener('touchstart', e => {
-  if (!G.running) return;
-  if (window.__keyEditMode) return; // ★ 拦截编辑模式
-  if (e.target && e.target.closest && e.target.closest('#shop')) return;
+    if (!G.running) return;
+    if (window.__keyEditMode) return;
+    if (e.target && e.target.closest && e.target.closest('#shop')) return;
 
     for (const t of e.changedTouches){
       if (t.target.closest && t.target.closest('[data-ui]')) continue;
@@ -424,9 +400,9 @@ if (IS_TOUCH){
     if (!el) return;
     let tid = null, lx = 0, ly = 0, moved = 0;
     el.addEventListener('touchstart', e => {
-  e.preventDefault(); e.stopPropagation();
-  if (!G.running) return;
-  if (window.__keyEditMode) return; // ★ 拦截编辑模式
+      e.preventDefault(); e.stopPropagation();
+      if (!G.running) return;
+      if (window.__keyEditMode) return;
       const t = e.changedTouches[0];
       tid = t.identifier;
       lx = t.clientX;
@@ -454,7 +430,6 @@ if (IS_TOUCH){
     el.addEventListener('touchcancel', () => { tid = null; if (up) up(); });
   }
 
-  /* FIRE 键：手雷模式 = 捏雷/丢出；普通模式 = 开火 */
   hold(document.getElementById('btnFire'),
        () => {
          if (typeof grenadeState !== 'undefined' && grenadeState.active){
@@ -475,66 +450,57 @@ if (IS_TOUCH){
          }
        });
 
-  (function bindAdsButton(){
-    const el = document.getElementById('btnAds');
-    if (!el) return;
-    let tid = null, lx = 0, ly = 0, moved = 0;
+ // ★ 开镜按钮改为点击切换开镜（慢速平滑过渡在 adsTime 里控制）
+(function bindAdsButton(){
+  const el = document.getElementById('btnAds');
+  if (!el) return;
+  let tid = null, lx = 0, ly = 0, moved = 0;
 
-    const finish = () => {
-      if (SET.adsMode !== 'toggle'){
-        if (typeof setADS === 'function') setADS(false);
-        el.classList.remove('on');
-      }
-      tid = null;
-    };
+  el.addEventListener('touchstart', e => {
+    e.preventDefault(); e.stopPropagation();
+    if (!G.running || tid !== null) return;
+    if (window.__keyEditMode) return;
+    const t = e.changedTouches[0];
+    tid = t.identifier;
+    lx = t.clientX;
+    ly = t.clientY;
+    moved = 0;
+    // ★ 点击切换开镜，避免每帧按键状态判断
+    if (typeof toggleADS === 'function') toggleADS();
+    el.classList.toggle('on', player.ads);
+  }, { passive: false });
 
-    el.addEventListener('touchstart', e => {
-  e.preventDefault(); e.stopPropagation();
-  if (!G.running || tid !== null) return;
-  if (window.__keyEditMode) return; // ★ 拦截编辑模式
-      const t = e.changedTouches[0];
-      tid = t.identifier;
+  el.addEventListener('touchmove', e => {
+    if (!SET.dragLook || tid === null || !G.running) return;
+    for (const t of e.changedTouches){
+      if (t.identifier !== tid) continue;
+      const dx = t.clientX - lx, dy = t.clientY - ly;
       lx = t.clientX;
       ly = t.clientY;
-      moved = 0;
-      if (SET.adsMode === 'toggle'){
-        if (typeof toggleADS === 'function') toggleADS();
-      } else {
-        if (typeof setADS === 'function') setADS(true);
-        el.classList.add('on');
-      }
-    }, { passive: false });
+      moved += Math.hypot(dx, dy);
+      if (moved < DRAG_DEADZONE) continue;
+      mouseDX += dx * SET.touchSens;
+      mouseDY += dy * SET.touchSens;
+    }
+    e.preventDefault();
+  }, { passive: false });
 
-    el.addEventListener('touchmove', e => {
-      if (!SET.dragLook || tid === null || !G.running) return;
-      for (const t of e.changedTouches){
-        if (t.identifier !== tid) continue;
-        const dx = t.clientX - lx, dy = t.clientY - ly;
-        lx = t.clientX;
-        ly = t.clientY;
-        moved += Math.hypot(dx, dy);
-        if (moved < DRAG_DEADZONE) continue;
-        mouseDX += dx * SET.touchSens;
-        mouseDY += dy * SET.touchSens;
-      }
-      e.preventDefault();
-    }, { passive: false });
+  el.addEventListener('touchend',    e => { if (tid === null) return; e.preventDefault(); tid = null; }, { passive: false });
+  el.addEventListener('touchcancel', () => { if (tid === null) return; tid = null; });
+})();
 
-    el.addEventListener('touchend',    e => { if (tid === null) return; e.preventDefault(); finish(); }, { passive: false });
-    el.addEventListener('touchcancel', () => { if (tid === null) return; finish(); });
-  })();
-
-  hold(document.getElementById('btnCrouch'),
-       () => {
-         keys['ControlLeft'] = true;
-         const b = document.getElementById('btnCrouch');
-         if (b) b.classList.add('on');
-       },
-       () => {
-         keys['ControlLeft'] = false;
-         const b = document.getElementById('btnCrouch');
-         if (b) b.classList.remove('on');
-       });
+  // ★ 蹲按钮改为点击切换（不再按住生效）
+(function bindCrouchButton(){
+  const el = document.getElementById('btnCrouch');
+  if (!el) return;
+  el.addEventListener('touchstart', e => {
+    e.preventDefault(); e.stopPropagation();
+    if (!G.running || G.shopOpen || G.paused) return;
+    if (window.__keyEditMode) return;
+    player.crouchLatch = !player.crouchLatch;
+    el.classList.toggle('on', player.crouchLatch);
+  }, { passive: false });
+})();
 
   function tap(id, fn){
     const el = document.getElementById(id);
@@ -542,7 +508,12 @@ if (IS_TOUCH){
     el.addEventListener('touchstart', e => {
       e.preventDefault();
       e.stopPropagation();
-      if (G.running) fn();
+      
+      if (id === 'btnPause' || id === 'btnSet' || id === 'btnAttach' || id === 'btnWeaponShop') {
+        fn();
+      } else if (G.running) {
+        fn();
+      }
     }, { passive: false });
   }
 
@@ -558,6 +529,10 @@ if (IS_TOUCH){
   tap('btnPlace',   () => { if (typeof confirmPlace === 'function') confirmPlace(); });
   tap('btnCancel',  () => { if (typeof cancelPlacing === 'function') cancelPlacing(); });
   tap('btnGrenade', () => { if (typeof toggleGrenade === 'function') toggleGrenade(); });
+  tap('btnAttach',  () => { if (typeof openAttachShop === 'function') openAttachShop(); });
+  
+  // ✅ 军火库按钮
+  tap('btnWeaponShop', () => { if (typeof openWeaponShop === 'function') openWeaponShop(); });
 
   const fsBtn = document.getElementById('btnFullscreen');
   if (fsBtn){
@@ -580,11 +555,11 @@ if (IS_TOUCH){
       if (G.running && !G.shopOpen && !G.paused) fn();
     });
     el.addEventListener('touchstart', e => {
-  e.preventDefault();
-  e.stopPropagation();
-  if (window.__keyEditMode) return; // ★ 拦截编辑模式
-  if (G.running) fn();
-}, { passive: false });
+      e.preventDefault();
+      e.stopPropagation();
+      if (window.__keyEditMode) return;
+      if (G.running) fn();
+    }, { passive: false });
   };
   if (typeof UI !== 'undefined'){
     cmdRow(UI.rowAllyCmd,  commandAlly);
@@ -616,27 +591,39 @@ if (IS_TOUCH){
 }
 
 /* =========================================================================
-   加载完成
-   ========================================================================= */
-window.addEventListener('load', () => {
-  if (typeof UI === 'undefined') return;
+   ★ 启动界面 / 暂停界面 / 各弹窗的绑定
+   以前用 window.addEventListener('load', ...) —— 但在异步串行加载器下，
+   多个脚本之间存在"让出一帧"的空隙，浏览器会误以为资源加载完毕，
+   在 input.js 执行前就触发了 window.load，导致这里注册的监听器
+   永远不会被调用，开始按钮点了没反应。
 
-  if (UI.startScreen){
+   现在改成：DOM 一就绪就尝试绑定；UI（hud.js）还没就绪就轮询等待。
+   完全不依赖 window.load，任何加载方案下都稳。
+   ========================================================================= */
+function _initStartScreenBindings(){
+  if (typeof UI === 'undefined') return false;
+
+  if (UI.startScreen && !UI.startScreen._boundStart){
+    UI.startScreen._boundStart = true;
     UI.startScreen.addEventListener('click', () => {
-      SFX.init();
+      // ★ 加保护：即使 SFX.init 出错也要能开始游戏
+      try { SFX.init(); } catch (e){ console.error('[SFX.init 失败]', e); }
       if (IS_TOUCH) forceLandscapeFullscreen();
-      if (typeof startGame === 'function') startGame();
+      if (typeof startGame === 'function') {
+        try { startGame(); } catch (e){ console.error('[startGame 失败]', e); }
+      }
     });
   }
 
-  if (UI.pause){
+  if (UI.pause && !UI.pause._boundPause){
+    UI.pause._boundPause = true;
     UI.pause.addEventListener('click', () => {
-      SFX.init();
+      try { SFX.init(); } catch (e){}
       if (IS_TOUCH){
         G.paused = false;
         G.running = true;
         UI.pause.classList.remove('on');
-        SFX.resume();
+        try { SFX.resume(); } catch (e){}
       } else {
         requestLock();
       }
@@ -644,7 +631,8 @@ window.addEventListener('load', () => {
   }
 
   const restartBtn = document.getElementById('restartBtn');
-  if (restartBtn){
+  if (restartBtn && !restartBtn._boundRestart){
+    restartBtn._boundRestart = true;
     const doRestart = (e) => {
       if (e){ e.preventDefault(); e.stopPropagation(); }
       if (typeof restart === 'function') restart();
@@ -652,4 +640,68 @@ window.addEventListener('load', () => {
     restartBtn.addEventListener('click', doRestart);
     restartBtn.addEventListener('touchend', doRestart, { passive: false });
   }
-});
+
+  document.querySelectorAll('.attachTab').forEach(tab => {
+    if (tab._boundTab) return;
+    tab._boundTab = true;
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.attachTab').forEach(t => {
+        t.classList.remove('on');
+        t.style.color = 'rgba(223,230,236,.5)';
+        t.style.borderColor = 'transparent';
+        t.style.background = 'transparent';
+      });
+      tab.classList.add('on');
+      tab.style.color = '#ffb340';
+      tab.style.borderColor = 'rgba(255,179,64,.45)';
+      tab.style.background = 'rgba(255,179,64,.12)';
+
+      const shopEl = document.getElementById('attachShop');
+      if (shopEl) shopEl.dataset.wid = tab.dataset.wid;
+
+      if (typeof renderAttachShop === 'function') renderAttachShop();
+    });
+  });
+
+  document.querySelectorAll('.subTab').forEach(tab => {
+    if (tab._boundSubTab) return;
+    tab._boundSubTab = true;
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.subTab').forEach(t => {
+        t.classList.remove('on');
+        t.style.color = 'rgba(255,255,255,.4)';
+        t.style.borderBottom = 'none';
+      });
+      tab.classList.add('on');
+      tab.style.color = '#fff';
+      tab.style.borderBottom = '2px solid #ffb340';
+
+      const isAttach = tab.dataset.tab === 'attach';
+      document.getElementById('attachShopList').style.display = isAttach ? 'flex' : 'none';
+      document.getElementById('ammoShopList').style.display = isAttach ? 'none' : 'flex';
+    });
+  });
+
+  if (typeof updateWeaponSlotsUI === 'function') updateWeaponSlotsUI();
+  return true;
+}
+
+(function bindStartScreen(){
+  // 万一 HTML 还没解析完（一般不会，但保险）
+  if (document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', bindStartScreen, { once: true });
+    return;
+  }
+  // DOM 已就绪，立即尝试
+  if (_initStartScreenBindings()) return;
+  // UI 还没定义（hud.js 还在路上），轮询等待
+  let tries = 0;
+  const timer = setInterval(() => {
+    tries++;
+    if (_initStartScreenBindings()) { clearInterval(timer); return; }
+    if (tries > 100){ // 5 秒超时
+      clearInterval(timer);
+      console.error('❌ [启动] 等待 UI 超时，开始按钮未绑定。请检查 hud.js 是否加载成功。');
+    }
+  }, 50);
+})();

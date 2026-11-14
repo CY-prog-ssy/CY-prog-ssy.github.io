@@ -1,4 +1,4 @@
-/* =========================================================================
+ /* =========================================================================
    map.js
    60×60 废弃仓库区 —— 场地、围栏、建筑、集装箱、掩体、杂物、远景
 
@@ -474,10 +474,10 @@ function box(w, h, d, x, y, z, mat, opt){
   for (let z = Z0 + 2.4; z <= Z1 - 1.4; z += 4.4)
     box(0.7, 4.0, 0.7, X1 - 0.5, 0, z, MAT.concrete, { uvScale: [.2, 1], map: '#3b4147' });
   box(0.7, 4.0, 0.7, X0 + 3.5, 0, Z1 - 0.6, MAT.concrete, { uvScale: [.2, 1] });
-
+ 
   /* 二楼楼板：可站立、是天护顶，但不是墙 */
-  box(W, 0.42, D, cx, 4.0, cz, MAT.concrete,
-      { uvScale: [3.5, 5.0], collide: false, ground: true, ceiling: true, map: '#4a525a' });
+box(W, 0.42, D, cx, 4.0, cz, MAT.concrete,
+    { uvScale: [3.5, 5.0], collide: false, ground: true, ceiling: true, map: '#4a525a' });
 
   /* 栏杆 —— 南边留开口给坡道 */
   box(7.5, 1.05, 0.24, -25.25, DECK, Z1 - 0.15, MAT.darkMetal);
@@ -511,39 +511,34 @@ function box(w, h, d, x, y, z, mat, opt){
           玩家走到顶会踩空，平台补上落脚点，并跨过坡顶与楼板南边缘
        4. 坡底加黄黑警示条、两侧加低护栏、坡顶加过渡板
      ===================================================================== */
-  const rampLen = 9.5, rampW = 5.0;
-  const sh = new THREE.Shape();
-  sh.moveTo(0, 0); sh.lineTo(rampLen, 0); sh.lineTo(rampLen, DECK); sh.lineTo(0, 0);
-  const rg = new THREE.ExtrudeGeometry(sh, { depth: rampW, bevelEnabled: false });
-  rg.rotateY(PI);
-  rg.rotateY(-PI / 2);
-  rg.computeVertexNormals();
-  {                                                  // extrude UV 是世界单位
-    const uv = rg.attributes.uv;
-    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 0.25, uv.getY(i) * 0.25);
-  }
-  const RX = -21.2, RZ = 15.2;                       // 与楼板边缘重叠 0.3
-  const ramp = new THREE.Mesh(rg, MAT.concrete);
-  ramp.position.set(RX, 0, RZ);
-  ramp.castShadow = ramp.receiveShadow = true;
-  scene.add(ramp);
-  worldSolid.push(ramp);
-  groundMesh.push(ramp);
-  mapRects.push({ x: RX + rampW / 2, z: RZ - rampLen / 2, w: rampW, d: rampLen, c: '#5d666e' });
+  /* ---- access ramp: triangular prism rising toward -Z ---- */
+const rampLen = 9.5, rampW = 4.2;
+const sh = new THREE.Shape();
+sh.moveTo(0,0); sh.lineTo(rampLen,0); sh.lineTo(rampLen,DECK); sh.lineTo(0,0);
+const rg = new THREE.ExtrudeGeometry(sh, { depth: rampW, bevelEnabled:false });
+rg.rotateY(PI);                                   // slope rises toward -X
+rg.rotateY(-PI/2);                                // ...then toward -Z
+rg.computeVertexNormals();
+{                                                  // extrude UVs are world units
+  const uv = rg.attributes.uv;
+  for (let i=0;i<uv.count;i++) uv.setXY(i, uv.getX(i)*0.25, uv.getY(i)*0.25);
+}
+const RX = -21.2, RZ = 15.2;                       // overlaps the slab edge by 0.3
+const ramp = new THREE.Mesh(rg, MAT.concrete);
+ramp.position.set(RX, 0, RZ);
+ramp.castShadow = ramp.receiveShadow = true;
+scene.add(ramp); worldSolid.push(ramp); groundMesh.push(ramp);
+mapRects.push({x:RX+rampW/2, z:RZ-rampLen/2, w:rampW, d:rampLen, c:'#5d666e'});
 
-  /* ★★ 坡顶过渡平台 ★★
-     楔形挤出体在坡顶只是一条线，玩家走到顶会踩空。
-     这块板补上落脚点：顶面正好在 DECK 高度，深 1.4 米，
-     跨过坡顶（z = 5.7）和楼板南边缘（z = 6），衔接两处。
-     collide: false 防止挡住从下方爬坡的玩家。 */
-  box(rampW + 0.4, 0.42, 1.4,
-      RX + rampW / 2, DECK - 0.42, RZ - rampLen + 0.6,
-      MAT.concrete,
-      { uvScale: [1.5, 0.5], ground: true, ceiling: false, collide: false, map: '#5d666e' });
+/* walls down both sides so you can only mount it from the bottom */
+addCollider(RX-0.12, 0, RZ-rampLen/2, 0.26, DECK+0.3, rampLen);
+addCollider(RX+rampW+0.12, 0, RZ-rampLen/2, 0.26, DECK+0.3, rampLen);
 
-  /* 两侧封墙：只比坡顶高一点，用来挡住从侧面翻越的玩家 */
-  addCollider(RX - 0.12,        0, RZ - rampLen / 2, 0.26, DECK + 0.3, rampLen);
-  addCollider(RX + rampW + 0.12, 0, RZ - rampLen / 2, 0.26, DECK + 0.3, rampLen);
+/* 原版精髓：北端封口
+   斜坡下方是一个三角空洞。如果这里没有墙，底楼的玩家直接走进去就会穿模。
+   这堵墙高 4.2 米（DECK - 0.22）：从一楼看它是不可逾越的实体，
+   但爬坡的玩家脚部高度超过 4.2 米就能顺利跨过去，完美衔接到二楼楼板。 */
+addCollider(RX+rampW/2, 0, RZ-rampLen+0.15, rampW, DECK-0.22, 0.30);
 
   /* 斜坡扶手 —— 从坡底到坡顶连贯不断 */
   const rampAng = Math.atan2(DECK, rampLen), hyp = Math.hypot(rampLen, DECK);
@@ -741,20 +736,27 @@ const CONTAINER_COLORS = [0xa85748, 0x53718c, 0x707f56, 0xab8a3f, 0x8b9096, 0x7e
     for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 2.4, uv.getY(i) * 1.0);
   }
   const list = [
-    /* 东侧走廊 —— 两排南北向，位置对齐让通道笔直通畅 */
-    [12.6, 0, -20], [12.6, 0, -10], [12.6, 0, 0], [12.6, 0, 10], [12.6, 0, 20],
-    [19.4, 0, -20], [19.4, 0, -10], [19.4, 0, 0], [19.4, 0, 10], [19.4, 0, 20],
-    /* 走廊里只叠一层，打破视线又不至于形成整面高墙 */
-    [19.4, CH, 0],
-    /* 散落掩体 —— 兼顾层次感与出生点视野 */
-    [-4.5, 0, -21.5],       // 北侧
-    [-13.0, 0, -4.0],       // 西侧
-    [-18.0, 0, 14.0],       // 西北
-    [24.0, 0, -3.0], [24.0, 0, 8.0],   // 东侧靠墙但不贴围栏
-    [6.5, 0, 18.0],         // 出生点前方偏右的观察掩体
-    [-9.0, 0, 21.0],        // 出生点左后方
-    [17.0, 0, -24.0]        // 北侧偏东
-  ];
+  /* 东侧主走廊 —— 错开排布，留出宽敞的交火通道 */
+  [12.6, 0, -20], [12.6, 0, -8], [12.6, 0, 4], [12.6, 0, 16],
+  [12.6, CH, -8], // ★ 新增：叠一层，制造高低差掩体
+  
+  [19.4, 0, -14], [19.4, 0, -2], [19.4, 0, 10], [19.4, 0, 22],
+  [19.4, CH, 10], // ★ 新增：叠一层
+  
+  /* 散落掩体 —— 兼顾层次感与出生点视野 */
+  [-4.5, 0, -21.5],       
+  [-13.0, 0, -4.0],       
+  [-18.0, 0, 14.0],       
+  [24.0, 0, -3.0], [24.0, 0, 8.0],   
+  [6.5, 0, 18.0],         
+  [-9.0, 0, 21.0],        
+  [17.0, 0, -24.0],       
+  
+  /* ★ 新增：中场核心区的 L 型掩体堡垒 */
+  [0.0, 0, -6.0],
+  [2.7, 0, -6.0],
+  [0.0, CH, -6.0] // 中场的制高点
+];
   const entries = list.map((p, i) => {
     const rotY = (i >= 11) ? (i % 2 === 0 ? PI / 2 : 0) : 0;
     const w = rotY === 0 ? CW : CL;
@@ -764,6 +766,99 @@ const CONTAINER_COLORS = [0xa85748, 0x53718c, 0x707f56, 0xab8a3f, 0x8b9096, 0x7e
     return { x: p[0], y: p[1] + CH / 2, z: p[2], rotY, color: CONTAINER_COLORS[i % CONTAINER_COLORS.length] };
   });
   instancedByColor(geo, MAT.container, entries);
+  
+  /* =====================================================================
+   ★ 终极安全版：仓库一楼的立式广告牌（实体防弹版）
+   ===================================================================== */
+{
+  const bannerTex = new THREE.TextureLoader().load('广告图.png', 
+    (tex) => { 
+      tex.encoding = THREE.sRGBEncoding; 
+      if (typeof MAXANISO !== 'undefined') tex.anisotropy = MAXANISO; 
+    },
+    undefined,
+    () => { console.warn('未找到 ad_banner.png'); }
+  );
+  
+  const bannerMat = new THREE.MeshStandardMaterial({
+    map: bannerTex, transparent: true, roughness: 0.8, metalness: 0.2,
+    polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 
+  });
+  
+  const frameMat = new THREE.MeshStandardMaterial({ color: 0x2a2e33, metalness: 0.6, roughness: 0.5 });
+  
+  const signGroup = new THREE.Group();
+  signGroup.position.set(-23, 0, 2);
+  signGroup.rotation.y = Math.PI / 2;
+  
+  // 1. ★ 实体金属背板（加厚到 0.25，用来挡子弹）
+  const backMesh = new THREE.Mesh(new THREE.BoxGeometry(4.2, 2.2, 0.25), frameMat);
+  backMesh.position.set(0, 1.8, 0);
+  backMesh.castShadow = true;
+  backMesh.receiveShadow = true;
+  signGroup.add(backMesh);
+  worldSolid.push(backMesh); // ★ 关键：加入弹道与视线检测列表
+
+  // 2. 广告画面 (贴在背板前面)
+  const boardMesh = new THREE.Mesh(new THREE.PlaneGeometry(4.0, 2.0), bannerMat);
+  boardMesh.position.set(0, 1.8, 0.126); 
+  signGroup.add(boardMesh);
+  
+  // 3. 左右两根粗壮的支撑腿
+  for (const px of [-1.8, 1.8]) {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.8, 0.2), frameMat);
+    leg.position.set(px, 0.4, 0);
+    leg.castShadow = true;
+    leg.receiveShadow = true;
+    signGroup.add(leg);
+    worldSolid.push(leg); // 腿也能挡子弹
+  }
+  
+  // 4. 顶部装饰压条
+  const topBar = new THREE.Mesh(new THREE.BoxGeometry(4.3, 0.15, 0.3), frameMat);
+  topBar.position.set(0, 2.95, 0);
+  topBar.castShadow = true;
+  signGroup.add(topBar);
+  worldSolid.push(topBar);
+  
+  scene.add(signGroup);
+  
+  // ★ 5. 注册移动碰撞体 (防止玩家穿模走进去)
+  addCollider(-23, 0, 2, 0.4, 3.0, 4.2);
+  mapRects.push({ x: -23, z: 2, w: 0.4, d: 4.2, c: '#4e555c' });
+}
+  
+  /* =====================================================================
+   ★ 开发者广告牌 / 赞助商展示位
+   将你要展示的图片命名为 ad_banner.png，放在和 index.html 同级的根目录
+   ===================================================================== */
+const bannerTex = new THREE.TextureLoader().load('广告图.png', 
+  (tex) => { 
+    tex.encoding = THREE.sRGBEncoding; 
+    tex.anisotropy = MAXANISO; 
+  },
+  undefined,
+  () => { console.warn('未找到 ad_banner.png，请确保它和 index.html 在同一个文件夹'); }
+);
+
+const bannerMat = new THREE.MeshBasicMaterial({
+  map: bannerTex, 
+  transparent: true, 
+  color: 0x777777,         // ★ 关键修改：把颜色压暗到深灰，纯白背景乘上这个系数后就不会触发泛光了
+  toneMapped: false,
+  side: THREE.DoubleSide,
+  polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 
+});
+
+// 尺寸：宽 8.8 米，高 2.7 米（刚好覆盖正面的大集装箱，不超出边缘）
+const bannerGeo = new THREE.PlaneGeometry(8.8, 2.7);
+const bannerMesh = new THREE.Mesh(bannerGeo, bannerMat);
+
+// ★ 位置定位：完美居中贴在出生点正前方的青绿色大集装箱（x=0.0, z=-6.0）正面
+// x=0 居中，y=1.425 居中，z=-4.64 是紧贴箱体正面的防闪烁坐标
+// 朝向正对出生点，抬高到第二层集装箱的正中心
+bannerMesh.position.set(0.0, 4.275, -4.64);
+scene.add(bannerMesh);
 
   /* ---- 序列号贴花 ----
      一个 4×6 图集给每个集装箱分配自己的编号，不需要每个箱子一张贴图，
@@ -1321,18 +1416,29 @@ const CONTAINER_COLORS = [0xa85748, 0x53718c, 0x707f56, 0xab8a3f, 0x8b9096, 0x7e
     mapRects.push({ x: px, z: pz, w: 2.4, d: 0.4, c: '#4e555c' });
   }
 
-  /* ---------- 场地灯杆 ---------- */
-  for (const [px, pz, ry] of [[-9.0, -27.0, 0.0], [22.0, -27.5, 0.0], [-27.5, 9.0, PI/2], [27.5, 26.0, PI/2], [0.5, 27.5, PI]]){
-    put(CYL, MC.dark, px, 3.6, pz, 0, 0, 0, 0.10, 7.2, 0.10);
-    put(BOX, MC.dark, px, 0.09, pz, 0, ry, 0, 0.44, 0.18, 0.44);
-    const c = Math.cos(ry), s = Math.sin(ry);
-    put(BOX, MC.dark, px + c * 0.42, 7.14, pz - s * 0.42, 0, ry, 0, 0.9, 0.07, 0.07);
-    for (const side of [-1, 1]){
-      put(BOX, MC.dark, px + c * 0.78, 7.02, pz - s * 0.78 + side * 0.28, 0.34, ry, 0, 0.52, 0.14, 0.34);
-    }
-    addCollider(px, 0, pz, 0.3, 7.2, 0.3);
-    extraShadows.push({ x: px, z: pz, hw: 0.3, hd: 0.3, s: 0.6 });
+   /* ---------- 场地灯杆 ---------- */
+if (typeof window.streetLights === 'undefined') window.streetLights = [];
+for (const [px, pz, ry] of [[-9.0, -27.0, 0.0], [22.0, -27.5, 0.0], [-27.5, 9.0, PI/2], [27.5, 26.0, PI/2], [0.5, 27.5, PI]]){
+  put(CYL, MC.dark, px, 3.6, pz, 0, 0, 0, 0.10, 7.2, 0.10);
+  put(BOX, MC.dark, px, 0.09, pz, 0, ry, 0, 0.44, 0.18, 0.44);
+  const c = Math.cos(ry), s = Math.sin(ry);
+  put(BOX, MC.dark, px + c * 0.42, 7.14, pz - s * 0.42, 0, ry, 0, 0.9, 0.07, 0.07);
+  for (const side of [-1, 1]){
+    put(BOX, MC.dark, px + c * 0.78, 7.02, pz - s * 0.78 + side * 0.28, 0.34, ry, 0, 0.52, 0.14, 0.34);
   }
+
+  // ★ 新增：真实的灯光
+  const spot = new THREE.SpotLight(0xffb340, 0, 35, Math.PI / 2.8, 0.6, 1.2);
+  spot.position.set(px + c * 0.78, 7.0, pz - s * 0.78);
+  spot.target.position.set(px + c * 0.78, 0, pz - s * 0.78);
+  spot.castShadow = false; 
+  scene.add(spot);
+  scene.add(spot.target);
+  window.streetLights.push(spot);
+
+  addCollider(px, 0, pz, 0.3, 7.2, 0.3);
+  extraShadows.push({ x: px, z: pz, hw: 0.3, hd: 0.3, s: 0.6 });
+}
 
   /* ---------- 叉车，停在装货区 ---------- */
   {

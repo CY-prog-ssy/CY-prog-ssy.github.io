@@ -5,6 +5,23 @@
 "use strict";
 
 function resetWorldState(){
+  // ✅ 每次重开一局，清空所有解锁的武器，重置为只有 M4
+  if (typeof unlockedWeapons !== 'undefined') {
+    unlockedWeapons.length = 0;
+    unlockedWeapons.push('rifle');
+    if (typeof updateWeaponSlotsUI === 'function') {
+      updateWeaponSlotsUI(); // 刷新底部武器槽 UI
+    }
+  }
+
+  // ✅ 新增：每次重开一局，清空所有配件，恢复武器默认属性
+  if (typeof ownedAttachments !== 'undefined') {
+    ownedAttachments.length = 0; 
+    for (const k in equippedAttachments) delete equippedAttachments[k];
+    if (typeof applyAllAttachments === 'function') applyAllAttachments();
+    if (typeof updateWeaponModels === 'function') updateWeaponModels();
+  }
+
   /* ★ 手雷状态清理 —— 必须在武器重置之前跑。
      若死亡时正处于手雷模式，grenadeState.active 和手持模型可见性会
      遗留到下一局，出现"左手枪右手雷"的叠影。同时把世界里所有活跃

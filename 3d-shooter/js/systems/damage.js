@@ -1,6 +1,5 @@
 /* =========================================================================
    damage.js
-   伤害结算 / 护甲规则 / 治疗 / 护甲自动恢复 / 无敌
    ========================================================================= */
 "use strict";
 
@@ -20,11 +19,10 @@ function shieldBreak(fromPos){
   if (typeof pushComms === 'function') pushComms('ARMOR', 'PLATE DEPLETED — SHIELD DOWN');
 }
 
-function applyDamageTo(p, amount, fromPos, pierce){
+function applyDamageTo(p, amount, fromPos, pierce, isHead){
   if (!p || p.dead || G.over) return;
   if (p.invulnT > 0) return;
 
-  /* ★ 无敌：只对玩家生效 */
   if (p === player && SET.godMode){
     if (typeof updateVitalsUI === 'function') updateVitalsUI();
     return;
@@ -77,6 +75,16 @@ function applyDamageTo(p, amount, fromPos, pierce){
       player.shake = Math.min(1.6, player.shake + clamp(amount / 24, 0.05, 0.20));
       SFX.shieldHit(panOf(fromPos));
     }
+    
+    /* ★ 金色爆头闪光 */
+    if (isHead) {
+      const glow = document.getElementById('headshotGlow');
+      if (glow) {
+        glow.style.opacity = '1';
+        setTimeout(() => { glow.style.opacity = '0'; }, 150);
+      }
+    }
+
     if (typeof damageIndicator === 'function') damageIndicator(fromPos);
     if (typeof updateVitalsUI === 'function') updateVitalsUI();
   }
@@ -87,8 +95,8 @@ function applyDamageTo(p, amount, fromPos, pierce){
   }
 }
 
-function damagePlayer(amount, fromPos, pierce){
-  applyDamageTo(player, amount, fromPos, pierce);
+function damagePlayer(amount, fromPos, pierce, isHead){
+  applyDamageTo(player, amount, fromPos, pierce, isHead);
 }
 
 function onPlayerDown(p, fromPos){
@@ -110,8 +118,7 @@ function revivePlayer(){
   setADS(false);
   G.grace = Math.max(G.grace, 1.6);
   G.dmgFlash = 0;
-  if (typeof pushComms === 'function')
-    pushComms('MEDIC', 'REVIVE COIN SPENT — BACK ON YOUR FEET');
+  if (typeof pushComms === 'function') pushComms('MEDIC', 'REVIVE COIN SPENT — BACK ON YOUR FEET');
   SFX.healDone();
   SFX.radio();
   if (typeof updateVitalsUI === 'function') updateVitalsUI();
@@ -152,8 +159,7 @@ function updateRecovery(dt){
 
   if (player.healT > 0){
     player.healT -= dt;
-    player.hp = Math.min(player.maxHp,
-                         player.hp + (player.maxHp * HEAL_FRAC / HEAL_DUR) * dt);
+    player.hp = Math.min(player.maxHp, player.hp + (player.maxHp * HEAL_FRAC / HEAL_DUR) * dt);
     if (player.hp >= player.maxHp || player.healT <= 0){
       player.healT = 0;
       SFX.healDone();
@@ -184,8 +190,7 @@ function updateBossUI(){
     UI.bossBlurb.textContent = b.boss ? b.boss.blurb : '';
   }
   UI.bossFill.style.transform  = 'scaleX(' + clamp(b.hp / b.maxHp, 0, 1) + ')';
-  UI.bossApFill.style.transform = 'scaleX(' +
-    clamp(b.armor / Math.max(b.maxArmor, 1), 0, 1) + ')';
+  UI.bossApFill.style.transform = 'scaleX(' + clamp(b.armor / Math.max(b.maxArmor, 1), 0, 1) + ')';
 }
 
 function setSquadOpen(open){

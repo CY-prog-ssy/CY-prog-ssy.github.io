@@ -112,14 +112,17 @@ function depenetrate(pos, radius, y0, y1){
 }
 
 function moveSlide(pos, dx, dz, radius, height){
-  const y0 = pos.y + 0.30, y1 = pos.y + height - 0.05;
+  const y0 = pos.y + 0.30, y1 = pos.y + height - 0.05;   // ignore tiny lips
+  
+  // ★ 修改：如果撞到障碍物，不再强行推开（depenetrate），而是只限制移动，让玩家贴着箱子滑落，这样跳跃时脚一越过顶部就能直接站上去。
   if (blocked(pos.x, pos.z, y0, y1, radius)){
-    pos.x += dx; pos.z += dz;
-    depenetrate(pos, radius, y0, y1);
+    if (dx !== 0 && !blocked(pos.x+dx, pos.z, y0, y1, radius)) pos.x += dx;
+    if (dz !== 0 && !blocked(pos.x, pos.z+dz, y0, y1, radius)) pos.z += dz;
     return;
   }
-  if (dx !== 0 && !blocked(pos.x + dx, pos.z, y0, y1, radius)) pos.x += dx;
-  if (dz !== 0 && !blocked(pos.x, pos.z + dz, y0, y1, radius)) pos.z += dz;
+  
+  if (dx !== 0 && !blocked(pos.x+dx, pos.z, y0, y1, radius)) pos.x += dx;
+  if (dz !== 0 && !blocked(pos.x, pos.z+dz, y0, y1, radius)) pos.z += dz;
 }
 
 /* --------------------------------------------------------------------------

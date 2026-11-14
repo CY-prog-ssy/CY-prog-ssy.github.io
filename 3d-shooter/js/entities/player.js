@@ -42,6 +42,7 @@ const player = {
 
   height: STAND_H, eye: STAND_H,
   onGround: true, crouch: false, sprint: false,
+  crouchLatch: false, // ★ 触屏蹲按钮的"开/关"锁存状态	
   bob: 0, bobAmp: 0, stepPhase: 0,
   landShake: 0, shake: 0, shakeSeed: rand(0, 100),
   recoilPitch: 0, recoilYaw: 0, recoilVelP: 0, recoilVelY: 0,

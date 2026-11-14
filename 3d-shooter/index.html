@@ -48,7 +48,7 @@ canvas{display:block;position:absolute;inset:0;}
 }
 #hud.on{opacity:1;}
 
-#cross{position:absolute;pointer-events:none;image-rendering:pixelated;}
+#cross{position:absolute;pointer-events:none;image-rendering:pixelated;transition:opacity 0.15s ease-out;}
 #cross.hidden{opacity:0;}
 
 /* 狙击镜 */
@@ -58,7 +58,7 @@ canvas{display:block;position:absolute;inset:0;}
   background:radial-gradient(circle at 50% 50%,
     rgba(0,0,0,0) 0 36vmin,
     rgba(0,0,0,.55) 36vmin 36.7vmin,
-    rgba(0,0,0,.99) 37.4vmin);
+    rgba(0,0,0,.99) 45.2vmin);
 }
 #scope .lens{
   position:absolute;left:50%;top:50%;width:72vmin;height:72vmin;
@@ -298,6 +298,15 @@ canvas{display:block;position:absolute;inset:0;}
   box-shadow:inset 0 0 140px rgba(255,179,64,.4);transition:opacity .35s;}
 #shieldGlow{position:absolute;inset:0;opacity:0;
   box-shadow:inset 0 0 130px rgba(120,185,255,.55);}
+  
+  /* ★ 新增：头部受击的金色边缘 */
+#headshotGlow{position:absolute;inset:0;opacity:0;pointer-events:none;
+  box-shadow:inset 0 0 150px rgba(255, 215, 0, 0.85);transition:opacity .1s;}
+  
+  /* ★ 命中反馈边框 */
+#hitFeedbackGlow{position:absolute;inset:0;opacity:0;pointer-events:none;
+  box-shadow:inset 0 0 60px rgba(255,255,255,0.7);transition:opacity 0.1s;}
+#hitFeedbackGlow.head{box-shadow:inset 0 0 100px rgba(255,215,0,0.9);}
 
 /* 击杀徽章 */
 #killBadge{position:absolute;left:50%;top:33%;opacity:0;
@@ -514,6 +523,10 @@ button.btn.small{margin-top:16px;font-size:11px;letter-spacing:.24em;padding:11p
   z-index:99;background:rgba(70,0,0,.94);color:#ffd9d5;
   font:11px/1.55 ui-monospace,Consolas,monospace;
   padding:10px 14px;display:none;white-space:pre-wrap;}
+  
+  /* 配件商店专用按钮 */
+.buyBtn.equip { background: rgba(0, 208, 255, 0.15) !important; border-color: rgba(0, 208, 255, 0.6) !important; color: #a8f5ff !important; }
+.attachTab.on { color: #ffb340 !important; border-bottom: 2px solid #ffb340; }
 
 /* ============================================================
    ★ 设置面板：全屏 + 左侧分类导航（替换原「移动端修复」整段）
@@ -780,6 +793,23 @@ button.btn.small{margin-top:16px;font-size:11px;letter-spacing:.24em;padding:11p
   font-size: 11px !important; letter-spacing: .16em !important;
   font-weight: 600 !important; color: rgba(223,230,236,.82) !important;
 }
+
+#settings .tog input[type=color]{
+  width: 54px; height: 30px;
+  padding: 0; border: 1px solid rgba(223,230,236,0.32);
+  background: rgba(12,16,20,0.6); border-radius: 3px;
+  cursor: pointer; -webkit-appearance: none; appearance: none;
+}
+#settings .tog input[type=color]::-webkit-color-swatch-wrapper{ padding: 2px; }
+#settings .tog input[type=color]::-webkit-color-swatch{ border: none; border-radius: 2px; }
+#settings .tog input[type=color]::-moz-color-swatch{ border: none; border-radius: 2px; }
+/* 防止颜色选择器盖住旁边的按钮 */
+#settings .tog button, 
+#settings .tog input[type=color] {
+  position: relative;
+  z-index: 10;
+}
+
 #settings .tog button {
   font-family: inherit !important; font-size: 10px !important;
   letter-spacing: .18em !important; font-weight: 700 !important;
@@ -1154,8 +1184,52 @@ body.key-edit #touchUI { display: block !important; }
 body.key-edit .tbtn { border: 1px dashed rgba(255, 179, 64, 0.9) !important; box-shadow: 0 0 15px rgba(255, 179, 64, 0.4); opacity: 0.85; }
 body.key-edit .tbtn.dragging { opacity: 1; border: 2px solid #fff !important; box-shadow: 0 0 25px #ffb340 !important; z-index: 2147483641 !important; }
 
+/* ★ 加载画面 */
+#loadScreen{
+  position: fixed; inset: 0; z-index: 2147483600;
+  background: #05070a;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: clamp(16px, 3vh, 32px);
+  padding: 24px;
+}
+#loadImage{
+  max-width: min(90vw, 900px);
+  max-height: 62vh;
+  width: auto; height: auto;
+  object-fit: contain;
+  image-rendering: auto;
+}
+#loadBarWrap{
+  width: min(560px, 72vw);
+  height: 8px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,179,64,0.38);
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+#loadBarFill{
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, #ffb340, #ff8a2a);
+  box-shadow: 0 0 14px rgba(255,179,64,0.65);
+  transition: width 0.18s cubic-bezier(.2,.9,.3,1);
+}
+#loadPercent{
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 13px; letter-spacing: 6px;
+  color: rgba(223,230,236,0.55);
+  font-weight: 700;
+}
 </style>
 </head>
+
+<div id="loadScreen">
+  <img src="loading.png" alt="" id="loadImage" onerror="this.style.display='none'">
+  <div id="loadBarWrap"><div id="loadBarFill"></div></div>
+  <div id="loadPercent">0%</div>
+</div>
+
 <!-- ★ 1v1 单挑 iframe 覆盖层 -->
 <div id="duelOverlay">
   <button id="duelCloseBtn" type="button">✕</button>
@@ -1163,16 +1237,15 @@ body.key-edit .tbtn.dragging { opacity: 1; border: 2px solid #fff !important; bo
 </div>
 
 
-<!-- 下面是你原本的代码 -->
-<canvas id="c"></canvas>
-...
-
 <canvas id="c"></canvas>
 
 <div id="hud">
   <div id="lowhp"></div>
   <div id="edgeGlow"></div>
   <div id="shieldGlow"></div>
+  <div id="shieldGlow"></div>
+  <div id="hitFeedbackGlow"></div>
+  <div id="headshotGlow"></div>
 
   <canvas id="cross"></canvas>
   <div id="hitmark"><i></i><i></i><i></i><i></i></div>
@@ -1391,6 +1464,8 @@ body.key-edit .tbtn.dragging { opacity: 1; border: 2px solid #fff !important; bo
     <div class="tbtn" id="btnHeal" data-ui="1"><span class="lab">治疗</span></div>
     <div class="tbtn" id="btnShop" data-ui="1"><span class="lab">商店</span></div>
     <div class="tbtn amber" id="btnGrenade" data-ui="1"><span class="lab">雷</span></div>
+    <div class="tbtn amber" id="btnAttach" data-ui="1" style="right: 252px; bottom: 174px; width: 54px; height: 54px; border-color: #00d0ff; color: #a8f5ff; background: rgba(18,54,80,.4);"><span class="lab">配件</span></div>
+    <div class="tbtn amber" id="btnWeaponShop" data-ui="1" style="right: 314px; bottom: 174px; width: 54px; height: 54px; border-color: #ff5a5a; color: #ffb0a4; background: rgba(80,18,18,.4);"><span class="lab">武器</span></div>
   </div>
 </div>
 <!-- ====================== 设置面板 ====================== -->
@@ -1406,286 +1481,373 @@ body.key-edit .tbtn.dragging { opacity: 1; border: 2px solid #fff !important; bo
     </div>
 
     <div class="setbody">
-      <!-- 左侧分类导航 -->
-      <nav class="setnav" id="setNav">
-  <button type="button" class="settab on" data-tab="quality">画质<small>QUALITY</small></button>
-  <button type="button" class="settab"    data-tab="sens">灵敏度<small>AIM</small></button>
-  <button type="button" class="settab"    data-tab="gameplay">功能<small>GAMEPLAY</small></button>
-  <button type="button" class="settab"    data-tab="keys">键位<small>KEYBIND</small></button>
-  <button type="button" class="settab"    data-tab="env">环境<small>WORLD</small></button>
-  <button type="button" class="settab"    data-tab="cheat">作弊<small>CHEATS</small></button>
-  <button type="button" class="settab"    data-tab="dev">开发者<small>DEVELOPER</small></button>
-</nav>
+  <!-- 左侧分类导航 -->
+  <nav class="setnav" id="setNav">
+    <button type="button" class="settab on" data-tab="quality">画质与特效<small>DISPLAY</small></button>
+    <button type="button" class="settab"    data-tab="controls">操作与手感<small>CONTROLS</small></button>
+    <button type="button" class="settab"    data-tab="gameplay">游戏功能<small>GAMEPLAY</small></button>
+    <button type="button" class="settab"    data-tab="assist">辅助瞄准<small>AIM ASSIST</small></button>
+    <button type="button" class="settab"    data-tab="esp">透视与视觉<small>ESP</small></button>
+    <button type="button" class="settab"    data-tab="cheat">作弊与模式<small>CHEATS</small></button>
+    <button type="button" class="settab"    data-tab="keys">键位设置<small>KEYBIND</small></button>
+    <button type="button" class="settab"    data-tab="fun">娱乐<small>FUN</small></button> <!-- ★ 新增 -->
+    <button type="button" class="settab"    data-tab="dev">开发者<small>DEVELOPER</small></button>
+  </nav>
 
-      <div class="setpanes" id="setPanes">
+  <div class="setpanes" id="setPanes">
 
-                <!-- ================= 画质 ================= -->
-        <section class="setpane on" data-pane="quality">
-
-  <!-- 画质档位（快选，点击后会把下面 5 项一起写成预设值） -->
-  <div class="setrow">
-    <div class="top"><span class="nm">画质档位</span><b id="vQuality">高清</b></div>
-    <div class="qgrid" id="segQuality">
-      <button type="button" class="qcard" data-v="smooth">
-        <span class="qn">流畅</span>
-        <span class="qd">低分辨率 · 关阴影 · 最省电</span>
-        <span class="qs">SMOOTH</span>
-      </button>
-      <button type="button" class="qcard" data-v="balanced">
-        <span class="qn">均衡</span>
-        <span class="qd">中等分辨率 · 低阴影 · 平衡</span>
-        <span class="qs">BALANCED</span>
-      </button>
-      <button type="button" class="qcard on" data-v="high">
-        <span class="qn">高清</span>
-        <span class="qd">全分辨率 · 软阴影 · 默认</span>
-        <span class="qs">HIGH</span>
-      </button>
-      <button type="button" class="qcard" data-v="ultra">
-        <span class="qn">超清</span>
-        <span class="qd">高 DPR · 高清阴影 · 高性能机型</span>
-        <span class="qs">ULTRA</span>
-      </button>
-    </div>
-    <div class="tip">机型越强档位越高。切换立即生效，重启不丢。</div>
-  </div>
-
-  <!-- ★ 5 个独立画质子项 -->
-  <div class="setrow">
-    <div class="top"><span class="nm">渲染精度</span><b id="vRenderScale">100%</b></div>
-    <input type="range" id="rRenderScale" min="50" max="150" step="5" value="100">
-    <div class="tip">场景渲染分辨率比例。越高越清晰锐利；超过 100% 会超采样，代价翻倍。</div>
-  </div>
-
-  <div class="setrow">
-    <div class="top"><span class="nm">建模精度</span><b id="vModelQuality">8×</b></div>
-    <input type="range" id="rModelQuality" min="1" max="16" step="1" value="8">
-    <div class="tip">各向异性过滤等级。越高，远处 / 斜面上的模型贴图越清晰、不发糊。</div>
-  </div>
-
-  <div class="setrow">
-    <div class="top"><span class="nm">阴影质量</span><b id="vShadowQuality">高</b></div>
-    <div class="seg" id="segShadow">
-      <button type="button" data-v="off">关闭</button>
-      <button type="button" data-v="low">低</button>
-      <button type="button" data-v="medium">中</button>
-      <button type="button" data-v="high">高</button>
-      <button type="button" data-v="ultra">超高</button>
-    </div>
-    <div class="tip">「超高」用 4096² 阴影贴图，仅为高性能电脑准备。切换会重编材质，可能有一瞬卡顿。</div>
-  </div>
-
-  <div class="setrow">
-    <div class="top"><span class="nm">抗锯齿</span><b id="vAntialias">×4</b></div>
-    <div class="seg" id="segAntialias">
-      <button type="button" data-v="2">×2</button>
-      <button type="button" data-v="4">×4</button>
-      <button type="button" data-v="8">×8</button>
-      <button type="button" data-v="16">×16</button>
-    </div>
-    <div class="tip">MSAA 采样级数。手机端会被硬件上限自动降级。</div>
-  </div>
-
-  <div class="setrow">
-    <div class="tog"><span class="nm">显示帧率</span><button id="togFps" type="button">OFF</button></div>
-    <div class="tip">打开后，屏幕右上角实时显示当前 FPS。</div>
-  </div>
-
-  <!-- 粒子密度（原样保留） -->
-  <div class="setrow">
-    <div class="top"><span class="nm">粒子 · 特效密度</span><b id="vFX">100%</b></div>
-    <input type="range" id="rFX" min="10" max="100" step="5" value="100">
-    <div class="tip">
-      控制火花、烟雾、血液、弹壳、雨雪粒子的数量。
-      值越低越流畅；低端机建议 40%~60%。改动自动保存。
-    </div>
-  </div>
-
-  <div class="setrow">
-    <div class="tog">
-      <span class="nm">恢复默认画质</span>
-      <button id="resetQuality" type="button">重置</button>
-    </div>
-    <div class="tip">把画质档位与粒子密度恢复到初始（触屏 = 流畅 / 桌面 = 高清）</div>
-  </div>
-</section>
-
-        <!-- ================= 灵敏度 ================= -->
-        <section class="setpane" data-pane="sens">
-          <div class="setrow">
-            <div class="top"><span class="nm">视角灵敏度</span><b id="vSens">1.00</b></div>
-            <input type="range" id="rSens" min="20" max="400" step="1" value="100">
-            <div class="tip">基础视角速度，鼠标与触屏共用</div>
-          </div>
-
-          <div class="setrow tOnly" id="rowTouch">
-            <div class="top"><span class="nm">触屏灵敏度</span><b id="vTouch">2.20</b></div>
-            <input type="range" id="rTouch" min="40" max="600" step="1" value="220">
-            <div class="tip">仅手机端：手指滑动屏幕的转向速度倍率</div>
-          </div>
-
-          <div class="setrow">
-            <div class="top"><span class="nm">开镜灵敏度</span><b id="vAds">1.00</b></div>
-            <input type="range" id="rAds" min="20" max="200" step="1" value="100">
-            <div class="tip">开镜时的额外倍率，低于 1 更稳</div>
-          </div>
-
-          <div class="setrow">
-            <div class="tog"><span class="nm">开镜模式</span><button id="togAdsMode" class="on">按下 HOLD</button></div>
-            <div class="tip">按下：按住右键开镜。点击：点一下开镜，再点退出</div>
-          </div>
-
-          <div class="setrow tOnly" id="rowDrag">
-            <div class="tog"><span class="nm">拖动瞄准</span><button id="togDrag" class="on">ON</button></div>
-            <div class="tip">按住 FIRE / AIM 后直接拖动手指转视角</div>
-          </div>
-
-          <div class="setrow">
-            <div class="tog"><span class="nm">辅助瞄准</span><button id="togAA" class="on">ON</button></div>
-            <div class="tip">准心靠近敌人时轻微吸附，只在开火时生效</div>
-          </div>
-
-          <div class="setrow aaOnly" id="rowAA">
-            <div class="top"><span class="nm">吸附强度</span><b id="vAA">0.65</b></div>
-            <input type="range" id="rAA" min="0" max="100" step="1" value="65">
-            <div class="tip">每次修正掉准心到目标偏差的比例</div>
-          </div>
-
-          <div class="setrow aaOnly" id="rowSlow">
-            <div class="top"><span class="nm">目标降速</span><b id="vSlow">0.35</b></div>
-            <input type="range" id="rSlow" min="0" max="100" step="1" value="35">
-            <div class="tip">准心压在目标上时灵敏度下降幅度</div>
-          </div>
-        </section>
-
-                <!-- ================= 功能 ================= -->
-<section class="setpane" data-pane="gameplay">
-  <div class="setrow tOnly" id="rowBtn">
-    <div class="top"><span class="nm">按键大小</span><b id="vBtn">1.00</b></div>
-    <input type="range" id="rBtn" min="70" max="130" step="1" value="100">
-    <div class="tip">整体缩放右下角按键组</div>
-  </div>
-
-  <!-- ★ 触屏按键布局编辑入口 -->
-  <div class="setrow tOnly" id="rowTouchEdit">
-    <div class="tog">
-      <span class="nm">触屏按键布局</span>
-      <button id="btnEditKeys" type="button">调整按键</button>
-    </div>
-    <div class="tip">点击后隐藏设置面板，直接拖动屏幕上的按钮位置。</div>
-  </div>
-
-  <div class="setrow">
-    <div class="tog"><span class="nm">护甲自动回复</span><button id="togArmor" class="on">ON</button></div>
-    <div class="tip">脱战 4 秒后以 7/秒 回满</div>
-  </div>
-
-  <div class="setrow">
-    <div class="tog"><span class="nm">医疗包治疗</span><button id="togHeal" class="on">ON</button></div>
-    <div class="tip">每局 3 个医疗包，按 H 回复 45 生命</div>
-  </div>
-
-  <div class="setrow">
-    <div class="tog"><span class="nm">小队面板</span><button id="togSquad" class="on">展开</button></div>
-    <div class="tip">收起后只留标题、友军与无人机两行</div>
-  </div>
-</section>
-
-        <!-- ================= 键位 ================= -->
-<section class="setpane" data-pane="keys">
-  <div class="setrow">
-    <div class="top">
-      <span class="nm">自定义键位</span>
-      <b id="keybindHint">点击任意键位进行编辑</b>
-    </div>
-    <div class="kbgrid" id="keybindList"></div>
-    <div class="tip">
-      点击某一行后，按下你想要的新按键即可替换（Esc 取消）。
-      如果新键已被其他动作占用，会自动解除原来的绑定。改动会自动保存到本地。
-    </div>
-    <div class="kbbtns">
-      <button type="button" class="ghost" id="resetKeybinds">恢复默认键位</button>
-    </div>
-  </div>
-</section>
-
-<!-- ================= 环境 ================= -->
-<section class="setpane" data-pane="env">
-  <div class="setrow">
-    <div class="top"><span class="nm">天气</span><b id="vWeather">晴</b></div>
-    <div class="seg" id="segWeather">
-      <button type="button" data-v="clear">晴</button>
-      <button type="button" data-v="overcast">阴</button>
-      <button type="button" data-v="rain">雨</button>
-      <button type="button" data-v="fog">雾</button>
-      <button type="button" data-v="snow">雪</button>
-    </div>
-  </div>
-
-  <div class="setrow">
-    <div class="top"><span class="nm">时间</span><b id="vTime">白天</b></div>
-    <div class="seg" id="segTime">
-      <button type="button" data-v="day">白天</button>
-      <button type="button" data-v="dusk">黄昏</button>
-      <button type="button" data-v="night">夜晚</button>
-    </div>
-  </div>
-</section>
-
-        <!-- ================= 作弊 ================= -->
-        <section class="setpane" data-pane="cheat">
-          <div class="setrow">
-            <div class="tog"><span class="nm">无敌</span><button id="togGod">OFF</button></div>
-            <div class="tip">敌人对你造成的任何伤害都为 0</div>
-          </div>
-
-          <div class="setrow">
-            <div class="tog"><span class="nm">无限子弹</span><button id="togInfAmmo">OFF</button></div>
-            <div class="tip">不消耗弹匣、不需要换弹</div>
-          </div>
-
-          <div class="setrow">
-            <div class="tog"><span class="nm">透视 ESP</span><button id="togEsp">OFF</button></div>
-            <div class="tip">显示敌人方框 / 距离 / 名字 / 血条</div>
-          </div>
-
-          <div class="setrow">
-            <div class="top"><span class="nm">辅助瞄准强度</span><b id="vAAPow">0.65</b></div>
-            <input type="range" id="rAAPow" min="0" max="100" step="1" value="65">
-            <div class="tip">0 = 关闭 · 1 = 锁头自瞄。只在开火时触发，优先准星最近，其次距离。目标躲进掩体（头未露出）会立刻放弃锁定</div>
-          </div>
-        </section>
-        
-        
-        <!-- ================= 开发者 ================= -->
-        <section class="setpane" data-pane="dev">
-  <div class="setrow">
-    <div class="tog">
-      <span class="nm">立即阵亡</span>
-      <button id="devSuicide" type="button" class="devDanger">☠ 阵亡</button>
-    </div>
-    <div class="tip">直接倒下。持有复活币会先消耗一枚，走正常死亡流程。只在战斗中可用。</div>
-  </div>
-
-  <div class="setrow">
-    <div class="tog">
-      <span class="nm">增加金币</span>
-      <button id="devAddGold" type="button">+1000</button>
-    </div>
-    <div class="tip">直接 +1000 信用点。商店打开时会立即刷新可购买状态。</div>
-  </div>
-
-  <div class="setrow">
-    <div class="tog">
-      <span class="nm">结束当前波次</span>
-      <button id="devEndWave" type="button">强制清波</button>
-    </div>
-    <div class="tip">清空场上敌人并进入波次间商店阶段。已在波次间时忽略。</div>
-  </div>
-</section>
-
+    <!-- ================= 1. 画质与特效 ================= -->
+    <section class="setpane on" data-pane="quality">
+      <div class="setrow">
+        <div class="top"><span class="nm">画质档位</span><b id="vQuality">高清</b></div>
+        <div class="qgrid" id="segQuality">
+  <button type="button" class="qcard" data-v="smooth"><span class="qn">流畅</span><span class="qd">低分辨率 · 关阴影 · 最省电</span><span class="qs">SMOOTH</span></button>
+  <button type="button" class="qcard" data-v="balanced"><span class="qn">均衡</span><span class="qd">中等分辨率 · 低阴影 · 平衡</span><span class="qs">BALANCED</span></button>
+  <button type="button" class="qcard on" data-v="high"><span class="qn">高清</span><span class="qd">全分辨率 · 软阴影 · 默认</span><span class="qs">HIGH</span></button>
+  <button type="button" class="qcard" data-v="ultra"><span class="qn">超清</span><span class="qd">高 DPR · 高清阴影 · 高性能</span><span class="qs">ULTRA</span></button>
+  <button type="button" class="qcard" data-v="pc" style="grid-column: 1 / -1; border-color: rgba(255,59,48,.4);"><span class="qn" style="color: #ff3b30;">PC级画质</span><span class="qd" style="color: rgba(255,59,48,.8);">极限光影 · 300%粒子 · 手机极易闪退</span><span class="qs">EXTREME</span></button>
+</div>
+        <div class="tip">机型越强档位越高。切换立即生效，重启不丢。</div>
       </div>
+
+      <div class="setrow">
+        <div class="top"><span class="nm">渲染精度</span><b id="vRenderScale">100%</b></div>
+        <input type="range" id="rRenderScale" min="50" max="150" step="5" value="100">
+      </div>
+      <div class="setrow">
+        <div class="top"><span class="nm">建模精度</span><b id="vModelQuality">8×</b></div>
+        <input type="range" id="rModelQuality" min="1" max="16" step="1" value="8">
+      </div>
+      <div class="setrow">
+        <div class="top"><span class="nm">阴影质量</span><b id="vShadowQuality">高</b></div>
+        <div class="seg" id="segShadow">
+          <button type="button" data-v="off">关闭</button>
+          <button type="button" data-v="low">低</button>
+          <button type="button" data-v="medium">中</button>
+          <button type="button" data-v="high">高</button>
+          <button type="button" data-v="ultra">超高</button>
+        </div>
+      </div>
+      <div class="setrow">
+        <div class="top"><span class="nm">抗锯齿</span><b id="vAntialias">×4</b></div>
+        <div class="seg" id="segAntialias">
+          <div class="seg" id="segAntialias">
+  <button type="button" data-v="2">×2</button>
+  <button type="button" data-v="4">×4</button>
+  <button type="button" data-v="8">×8</button>
+  <button type="button" data-v="16">×16</button>
+</div>
+        </div>
+      </div>
+      <div class="setrow">
+  <div class="top"><span class="nm">粒子 · 特效密度</span><b id="vFX">100%</b></div>
+  <input type="range" id="rFX" min="10" max="300" step="10" value="100">
+</div>
+<div class="setrow">
+  <div class="top"><span class="nm">帧率限制 (FPS)</span><b id="vFPSLimit">60</b></div>
+  <div class="seg" id="segFPSLimit">
+    <button type="button" data-v="15">15</button>
+    <button type="button" data-v="30">30</button>
+    <button type="button" data-v="60" class="on">60</button>
+    <button type="button" data-v="90">90</button>
+    <button type="button" data-v="120">120</button>
+    <button type="button" data-v="144">144</button>
+    <button type="button" data-v="165">165</button>
+    <button type="button" data-v="0">无限制</button>
+  </div>
+</div>
+      <div class="setrow">
+        <div class="top"><span class="nm">天气</span><b id="vWeather">晴</b></div>
+        <div class="seg" id="segWeather">
+          <button type="button" data-v="clear">晴</button>
+          <button type="button" data-v="overcast">阴</button>
+          <button type="button" data-v="rain">雨</button>
+          <button type="button" data-v="fog">雾</button>
+          <button type="button" data-v="snow">雪</button>
+        </div>
+      </div>
+      <div class="setrow">
+        <div class="top"><span class="nm">时间</span><b id="vTime">白天</b></div>
+        <div class="seg" id="segTime">
+          <button type="button" data-v="day">白天</button>
+          <button type="button" data-v="dusk">黄昏</button>
+          <button type="button" data-v="night">夜晚</button>
+        </div>
+      </div>
+      <div class="setrow">
+        <div class="tog"><span class="nm">显示帧率</span><button id="togFps" type="button">OFF</button></div>
+      </div>
+      <div class="setrow">
+        <div class="tog"><span class="nm">减少渲染性能（实验性）</span><button id="togLowRender" type="button">OFF</button></div>
+        <div class="tip">开启后只渲染地图本体，隐藏敌人、武器与特效，极端省电。</div>
+      </div>
+      <div class="setrow">
+  <div class="tog">
+    <span class="nm">最大限度优化 (实验性)</span>
+    <button id="togExtremeOpt" type="button">OFF</button>
+  </div>
+  <div class="tip">在不降低画质和特效的前提下，通过画面降采样计算、视野外粒子剔除、AI分帧寻路，极限压榨帧数。</div>
+</div>
+      <div class="setrow">
+        <div class="tog"><span class="nm">恢复默认画质</span><button id="resetQuality" type="button">重置</button></div>
+      </div>
+    </section>
+
+    <!-- ================= 2. 操作与手感 ================= -->
+    <section class="setpane" data-pane="controls">
+      <div class="setrow">
+        <div class="top"><span class="nm">视角灵敏度</span><b id="vSens">1.00</b></div>
+        <input type="range" id="rSens" min="20" max="400" step="1" value="100">
+      </div>
+      <div class="setrow tOnly" id="rowTouch">
+        <div class="top"><span class="nm">触屏灵敏度</span><b id="vTouch">2.20</b></div>
+        <input type="range" id="rTouch" min="40" max="600" step="1" value="220">
+      </div>
+      <div class="setrow">
+        <div class="top"><span class="nm">开镜灵敏度</span><b id="vAds">1.00</b></div>
+        <input type="range" id="rAds" min="20" max="200" step="1" value="100">
+      </div>
+      <div class="setrow">
+        <div class="tog"><span class="nm">开镜模式</span><button id="togAdsMode" class="on">按下 HOLD</button></div>
+        <div class="tip">按下：按住右键开镜。点击：点一下开镜，再点退出</div>
+      </div>
+      <div class="setrow tOnly" id="rowDrag">
+        <div class="tog"><span class="nm">拖动瞄准</span><button id="togDrag" class="on">ON</button></div>
+        <div class="tip">按住 FIRE / AIM 后直接拖动手指转视角</div>
+      </div>
+      <div class="setrow tOnly" id="rowBtn">
+        <div class="top"><span class="nm">按键大小</span><b id="vBtn">1.00</b></div>
+        <input type="range" id="rBtn" min="70" max="130" step="1" value="100">
+      </div>
+      <div class="setrow tOnly" id="rowTouchEdit">
+        <div class="tog">
+          <span class="nm">触屏按键布局</span>
+          <button id="btnEditKeys" type="button">调整按键</button>
+        </div>
+        <div class="tip">点击后隐藏设置面板，直接拖动屏幕上的按钮位置。</div>
+      </div>
+    </section>
+
+    <!-- ================= 3. 游戏功能 ================= -->
+    <section class="setpane" data-pane="gameplay">
+      <div class="setrow">
+        <div class="tog">
+          <span class="nm">武器配件改装</span>
+          <button id="openAttachBtn" type="button" style="border-color: #00d0ff; color: #a8f5ff; background: rgba(18,54,80,.4);">前往改装台</button>
+        </div>
+      </div>
+      <div class="setrow">
+        <div class="tog"><span class="nm">护甲自动回复</span><button id="togArmor" class="on">ON</button></div>
+      </div>
+      <div class="setrow">
+        <div class="tog"><span class="nm">医疗包治疗</span><button id="togHeal" class="on">ON</button></div>
+      </div>
+      <div class="setrow">
+        <div class="tog"><span class="nm">小队面板</span><button id="togSquad" class="on">展开</button></div>
+      </div>
+      <div class="setrow">
+        <div class="tog"><span class="nm">命中反馈</span><button id="togHitFeed" class="on">ON</button></div>
+      </div>
+    </section>
+
+    <!-- ================= 4. 辅助瞄准 ================= -->
+    <section class="setpane" data-pane="assist">
+      <div class="setrow">
+        <div class="tog"><span class="nm">辅助瞄准</span><button type="button" class="togAA-btn on">ON</button></div>
+        <div class="tip">准心靠近敌人时自动吸附，只在开火时生效</div>
+      </div>
+      <div class="setrow aaOnly" id="rowAimPart">
+        <div class="top"><span class="nm">瞄准部位</span></div>
+        <div class="seg" id="segAimPart">
+          <button type="button" data-v="head" class="on">锁头</button>
+          <button type="button" data-v="body">锁身</button>
+          <button type="button" data-v="legs">锁腿</button>
+        </div>
+      </div>
+      <div class="setrow aaOnly" id="rowAAPow">
+        <div class="top"><span class="nm">辅助力度 / 压枪</span><b id="vAAPowText">75%</b></div>
+        <div class="seg" id="segAAPow">
+          <button type="button" data-v="0.25">弱</button>
+          <button type="button" data-v="0.50">中</button>
+          <button type="button" data-v="0.75" class="on">强</button>
+          <button type="button" data-v="1.0">自瞄</button>
+        </div>
+      </div>
+      <div class="setrow">
+        <div class="tog"><span class="nm">辅助瞄准自适应矫正</span><button id="togAACorrect" type="button">OFF</button></div>
+        <div class="tip">连续脱靶3次后，强行将准心吸附到敌人身上并预判弹道</div>
+      </div>
+    </section>
+
+    <!-- ================= 5. 透视与视觉 ================= -->
+    <section class="setpane" data-pane="esp">
+      <div class="setrow">
+        <div class="tog"><span class="nm">透视 ESP 主开关</span><button id="togEsp">OFF</button></div>
+        <div class="tip">显示敌人方框 / 距离 / 名字 / 血条</div>
+      </div>
+      <div class="setrow">
+        <div class="tog">
+          <span class="nm">ESP 彩虹流光模式 (动态变色)</span>
+          <button id="togEspRainbow" type="button">OFF</button>
+        </div>
+        <div class="tip">开启后，方框 / 射线 / 骨骼将变成随时间循环的彩色流光，无视下方的自定义颜色</div>
+      </div>
+      <div class="setrow">
+        <div class="tog">
+          <span class="nm">方框颜色 · 可见</span>
+          <input type="color" id="espColorVisible" value="#ff3c32">
+        </div>
+      </div>
+      <div class="setrow">
+        <div class="tog">
+          <span class="nm">方框颜色 · 遮挡</span>
+          <input type="color" class="esp-color-picker" data-key="espColorHidden" value="#5fd06a">
+        </div>
+      </div>
+      <div class="setrow">
+        <div class="tog">
+          <span class="nm">绘制射线</span>
+          <button type="button" class="esp-toggle-btn" data-key="espDrawRay">OFF</button>
+        </div>
+        <div class="tog">
+          <span class="nm">射线颜色</span>
+          <input type="color" class="esp-color-picker" data-key="espColorRay" value="#ffcc44">
+        </div>
+      </div>
+      <div class="setrow">
+        <div class="tog">
+          <span class="nm">绘制骨骼</span>
+          <button type="button" class="esp-toggle-btn" data-key="espDrawBone">OFF</button>
+        </div>
+        <div class="tog">
+          <span class="nm">骨骼颜色</span>
+          <input type="color" class="esp-color-picker" data-key="espColorBone" value="#00e0ff">
+        </div>
+      </div>
+      <div class="setrow">
+  <div class="tog">
+    <span class="nm">绘制预判线</span>
+    <button type="button" class="esp-toggle-btn" data-key="espAimLine">OFF</button>
+  </div>
+  <div class="tog">
+    <span class="nm">预判线颜色</span>
+    <input type="color" class="esp-color-picker" data-key="espColorAimLine" value="#ff0000">
+  </div>
+  <div class="tip">以准星为中心绘制辅助瞄准范围圆圈，并用线连接当前锁定的目标</div>
+</div>
+    </section>
+
+    <!-- ================= 6. 作弊与模式 ================= -->
+    <section class="setpane" data-pane="cheat">
+      <div class="setrow">
+        <div class="tog"><span class="nm">无敌</span><button id="togGod">OFF</button></div>
+      </div>
+      <div class="setrow">
+        <div class="tog"><span class="nm">无限子弹</span><button id="togInfAmmo">OFF</button></div>
+      </div>
+      <div class="setrow">
+        <div class="tog"><span class="nm">飞天模式 (准星朝哪飞哪)</span><button id="togFly" type="button">OFF</button></div>
+        <div class="tip">取消重力，抬头按W即可向上飞，低头按W向下飞。关闭后恢复正常掉落</div>
+      </div>
+      <div class="setrow">
+        <div class="tog"><span class="nm">杀戮光环 (无视墙壁)</span><button id="togAura" type="button">OFF</button></div>
+        <div class="top" style="margin-top:8px"><span class="nm">光环半径</span><b id="vAuraRadius">5.0</b></div>
+        <input type="range" id="rAuraRadius" min="1" max="30" step="0.5" value="5">
+        <div class="top" style="margin-top:8px"><span class="nm">每秒伤害 (2000为秒杀)</span><b id="vAuraDmg">50</b></div>
+        <input type="range" id="rAuraDmg" min="10" max="2000" step="10" value="50">
+        <div class="tog" style="margin-top:8px"><span class="nm">光环颜色</span><input type="color" id="auraColorPicker" value="#ff0044"></div>
+      </div>
+      <div class="setrow">
+        <div class="tog"><span class="nm">敌人AI模型颜色</span><button id="togEnemyColor" type="button">OFF</button></div>
+        <div class="tog" style="margin-top:8px"><span class="nm">模型颜色</span><input type="color" id="enemyColorPicker" value="#9d00ff"></div>
+        <div class="tip">开启后，所有敌人的实体模型会变成该颜色</div>
+      </div>
+    </section>
+
+    <!-- ================= 7. 键位设置 ================= -->
+    <section class="setpane" data-pane="keys">
+      <div class="setrow">
+        <div class="top">
+          <span class="nm">自定义键位</span>
+          <b id="keybindHint">点击任意键位进行编辑</b>
+        </div>
+        <div class="kbgrid" id="keybindList"></div>
+        <div class="kbbtns">
+          <button type="button" class="ghost" id="resetKeybinds">恢复默认键位</button>
+        </div>
+      </div>
+    </section>
+    
+    
+    <!-- ================= 9. 娱乐 ================= -->
+<section class="setpane" data-pane="fun">
+  <div class="setrow">
+    <div class="tog">
+      <span class="nm">模拟封号 (掉线弹窗)</span>
+      <button id="btnFakeBan" type="button" style="color: #ff3b30; border-color: rgba(255,59,48,.6); background: rgba(255,59,48,.1);">强行掉线</button>
     </div>
+    <div class="tip">点击后弹出虚假的“数据发生变化，您被迫下线”提示，需点击确定才能恢复。</div>
+  </div>
+
+  <div class="setrow">
+    <div class="tog"><span class="nm">魂环特效 (斗罗大陆)</span><button id="togSoulRing" type="button">OFF</button></div>
+    <div class="tip">在玩家脚下显示一圈旋转的光环</div>
+  </div>
+  <div class="setrow">
+    <div class="top"><span class="nm">魂环数量 (1-15)</span><b id="vSoulCount">1</b></div>
+    <input type="range" id="rSoulCount" min="1" max="15" step="1" value="1">
+  </div>
+  <div class="setrow">
+    <div class="top"><span class="nm">大小 (半径)</span><b id="vSoulSize">1.0</b></div>
+    <input type="range" id="rSoulSize" min="0.5" max="3.0" step="0.1" value="1.0">
+  </div>
+  <div class="setrow">
+    <div class="top"><span class="nm">粗细</span><b id="vSoulThick">0.1</b></div>
+    <input type="range" id="rSoulThick" min="0.02" max="0.5" step="0.01" value="0.1">
+  </div>
+  <div class="setrow">
+    <div class="top"><span class="nm">间隔 (上下距离)</span><b id="vSoulGap">0.1</b></div>
+    <input type="range" id="rSoulGap" min="0.0" max="0.5" step="0.02" value="0.1">
+  </div>
+  <div class="setrow">
+    <div class="tog">
+      <span class="nm">魂环颜色</span>
+      <input type="color" id="soulRingColor" value="#00ffff">
+    </div>
+  </div>
+</section>
+
+    <!-- ================= 9. 开发者 ================= -->
+    <section class="setpane" data-pane="dev">
+      <div class="setrow">
+        <div class="tog">
+          <span class="nm">开发者控制台</span>
+          <button id="togDevConsole" type="button">OFF</button>
+        </div>
+        <div class="tip">按 `~` 键或点击右上角图标呼出，支持捕获日志与指令。</div>
+      </div>
+      <div class="setrow">
+        <div class="tog">
+          <span class="nm">立即阵亡</span>
+          <button id="devSuicide" type="button" class="devDanger">☠ 阵亡</button>
+        </div>
+      </div>
+      <div class="setrow">
+        <div class="tog">
+          <span class="nm">增加金币</span>
+          <button id="devAddGold" type="button">+1000</button>
+        </div>
+      </div>
+      <div class="setrow">
+        <div class="tog">
+          <span class="nm">结束当前波次</span>
+          <button id="devEndWave" type="button">强制清波</button>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>
 
     <div class="setbtns">
       <button type="button" class="ghost" id="setReset">重置</button>
@@ -1721,8 +1883,78 @@ body.key-edit .tbtn.dragging { opacity: 1; border: 2px solid #fff !important; bo
   <div class="fbtn primary" id="keyEditDone">完成并退出</div>
 </div>
 
-<script src="three.min.js"></script>
+<!-- ====================== 全屏改装台 ====================== -->
+<div id="attachShop" class="hide" style="position: fixed; inset: 0; z-index: 99999; display: none; background: #0a0c0e; flex-direction: column; pointer-events: auto;">
+  
+  <div style="flex: 0 0 auto; display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-bottom: 1px solid rgba(223,230,236,.12); background: #10151b;">
+    <div>
+      <span class="lbl" style="font-size:12px; letter-spacing: .2em;">Armory & Customization</span>
+      <div style="font-size:22px; font-weight:800; color:#ffb340; letter-spacing: .1em;">武器改装台</div>
+    </div>
+    <div style="text-align:right;">
+      <span class="lbl">Credits</span>
+      <div style="font-size:24px; font-weight:800; color:#ffd98a; font-family: ui-monospace;">◎ <span id="attachShopGold">0</span></div>
+    </div>
+  </div>
 
+  <div style="flex: 1; display: flex; overflow: hidden;">
+    <!-- 左侧：武器列表导航 -->
+<div id="attachNav" style="flex: 0 0 200px; background: rgba(6,9,12,.55); border-right: 1px solid rgba(223,230,236,.10); display: flex; flex-direction: column; padding: 12px 8px; gap: 4px;">
+  <button class="attachTab on" data-wid="rifle" style="padding: 14px; text-align: left; background: rgba(255,179,64,.12); border: 1px solid rgba(255,179,64,.45); color: #ffb340; font-size: 13px; font-weight: 700; border-radius: 4px; cursor: pointer;">M4 CARBINE</button>
+  <button class="attachTab" data-wid="shotgun" style="padding: 14px; text-align: left; background: transparent; border: 1px solid transparent; color: rgba(223,230,236,.5); font-size: 13px; font-weight: 700; border-radius: 4px; cursor: pointer;">KS-12 PUMP</button>
+  <button class="attachTab" data-wid="sniper" style="padding: 14px; text-align: left; background: transparent; border: 1px solid transparent; color: rgba(223,230,236,.5); font-size: 13px; font-weight: 700; border-radius: 4px; cursor: pointer;">SR-7 LONGBOW</button>
+  <!-- ✅ 新增：巴雷特 -->
+  <button class="attachTab" data-wid="barrett" style="padding: 14px; text-align: left; background: transparent; border: 1px solid transparent; color: rgba(223,230,236,.5); font-size: 13px; font-weight: 700; border-radius: 4px; cursor: pointer;">.50 CAL BARRETT</button>
+</div>
+
+    <!-- 右侧：内容区 -->
+    <div style="flex: 1; display: flex; flex-direction: column; padding: 20px 30px; overflow-y: auto;">
+      <!-- 二级 Tab -->
+      <div style="display: flex; gap: 20px; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,.1); padding-bottom: 10px;">
+        <button class="subTab on" data-tab="attach" style="background: transparent; border: none; color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; letter-spacing: 1px; border-bottom: 2px solid #ffb340; padding-bottom: 6px;">配件 (Attachments)</button>
+        <button class="subTab" data-tab="ammo" style="background: transparent; border: none; color: rgba(255,255,255,.4); font-size: 15px; font-weight: 700; cursor: pointer; letter-spacing: 1px; padding-bottom: 6px;">子弹 (Ammunition)</button>
+      </div>
+
+      <!-- 列表容器 -->
+      <div id="attachShopList" style="display: flex; flex-direction: column; gap: 10px; padding-right: 10px;">
+        <!-- 动态生成配件 -->
+      </div>
+      <div id="ammoShopList" style="display: none; flex-direction: column; gap: 10px; padding-right: 10px;">
+        <!-- 动态生成子弹 -->
+      </div>
+    </div>
+  </div>
+
+  <div style="flex: 0 0 auto; padding: 16px 24px; border-top: 1px solid rgba(223,230,236,.12); background: #10151b; display: flex; justify-content: flex-end;">
+    <button class="btn small" id="attachShopClose" style="margin-top:0; pointer-events:auto; cursor:pointer; padding: 12px 30px; font-size: 13px;">完成并关闭</button>
+  </div>
+</div>
+<!-- ====================== 全屏改装台结束 ====================== -->
+<!-- ====================== 武器商店 ====================== -->
+<div id="weaponShop" class="hide" style="position: fixed; inset: 0; z-index: 99999; display: none; background: rgba(3,5,7,.95); backdrop-filter: blur(10px); flex-direction: column; pointer-events: auto;">
+  <div style="flex: 0 0 auto; display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; border-bottom: 1px solid rgba(223,230,236,.12); background: #10151b;">
+    <div>
+      <span class="lbl" style="font-size:12px; letter-spacing: .2em;">Weapon Armory</span>
+      <div style="font-size:22px; font-weight:800; color:#ffb340; letter-spacing: .1em;">军火库</div>
+    </div>
+    <div style="text-align:right;">
+      <span class="lbl">Credits</span>
+      <div style="font-size:24px; font-weight:800; color:#ffd98a; font-family: ui-monospace;">◎ <span id="weaponShopGold">0</span></div>
+    </div>
+  </div>
+
+  <div style="flex: 1; display: flex; padding: 20px 30px; overflow-y: auto; flex-wrap: wrap; gap: 20px; justify-content: center; align-content: flex-start;" id="weaponShopList">
+    <!-- 动态生成 -->
+  </div>
+
+  <div style="flex: 0 0 auto; padding: 16px 24px; border-top: 1px solid rgba(223,230,236,.12); background: #10151b; display: flex; justify-content: flex-end;">
+    <button class="btn small" id="weaponShopClose" style="margin-top:0; pointer-events:auto; cursor:pointer; padding: 12px 30px; font-size: 13px;">关闭军火库</button>
+  </div>
+</div>
+
+
+<script src="three.min.js"></script>
+<!-- 后续的 script 保持原样 -->
 <script>
 if (typeof THREE === 'undefined'){
   document.body.innerHTML =
@@ -1735,54 +1967,110 @@ if (typeof THREE === 'undefined'){
 </script>
 
 
-<!-- 游戏主体：按顺序加载，顺序不能乱 -->
-<script src="js/core/utils.js"></script>
-<script src="js/core/audio.js"></script>
-<script src="js/core/bgm.js"></script>
-<script src="js/core/renderer.js"></script>
-<script src="js/core/textures.js"></script>
-<script src="js/core/lighting.js"></script>
-<script src="js/core/weather.js"></script>
-<script src="js/core/environment.js"></script>
-<script src="js/core/dust.js"></script>
+<script>
+  (function() {
+    const blockedScripts = JSON.parse(localStorage.getItem('dev_blocked_js') || '[]');
+    if (blockedScripts.length > 0) {
+      console.warn("⛔ [DEV CONSOLE] 拦截器已激活。黑名单: ", blockedScripts);
+    }
 
-<script src="js/world/map.js"></script>
-<script src="js/world/signboard.js"></script>
+    const scripts = [
+      'js/core/utils.js',
+      'js/core/audio.js',
+      'js/core/bgm.js',
+      'js/core/renderer.js',
+      'js/core/textures.js',
+      'js/core/lighting.js',
+      'js/core/weather.js',
+      'js/core/environment.js',
+      'js/core/dust.js',
+      'js/world/map.js',
+      'js/world/signboard.js',
+      'js/entities/player.js',
+      'js/world/queries.js',
+      'js/core/effects.js',
+      'js/entities/weapon_models.js',
+      'js/entities/weapons.js',
+      'js/entities/enemy_model.js',
+      'js/entities/enemy_data.js',
+      'js/entities/enemy_ai.js',
+      'js/entities/ally.js',
+      'js/entities/drone.js',
+      'js/entities/turret.js',
+      'js/entities/grenade.js',
+      'js/ui/hud.js',
+      'js/systems/input.js',
+      'js/systems/settings.js',
+      'js/systems/shooting.js',
+      'js/systems/attachments.js',
+      'js/systems/damage.js',
+      'js/systems/player_update.js',
+      'js/systems/vm_anim.js',
+      'js/systems/camera.js',
+      'js/ui/shop.js',
+      'js/ui/weapon_shop.js',
+      'js/game/flow.js',
+      'js/game/intro.js',
+      'js/game/waves.js',
+      'js/ui/esp.js',
+      'js/ui/dev_console.js',
+      'js/main.js',
+      'music.js',
+      'announcement.js'
+    ];
 
-<script src="js/entities/player.js"></script>
-<script src="js/world/queries.js"></script>
-<script src="js/core/effects.js"></script>
+    // 1. 让进度条先平滑地跑起来
+    const barFill = document.getElementById('loadBarFill');
+    const pctEl = document.getElementById('loadPercent');
+    if (barFill) {
+      barFill.style.transition = 'width 4s cubic-bezier(0.1, 0.7, 0.3, 1)';
+      barFill.style.width = '90%';
+      let pct = 0;
+      window.__loadTimer = setInterval(() => {
+        pct += Math.floor(Math.random() * 5) + 2;
+        if (pct > 90) pct = 90;
+        if (pctEl) pctEl.textContent = pct + '%';
+      }, 150);
+    }
 
-<script src="js/entities/weapon_models.js"></script>
-<script src="js/entities/weapons.js"></script>
-<script src="js/entities/enemy_model.js"></script>
-<script src="js/entities/enemy_data.js"></script>
-<script src="js/entities/enemy_ai.js"></script>
-<script src="js/entities/ally.js"></script>
-<script src="js/entities/drone.js"></script>
-<script src="js/entities/turret.js"></script>
-<script src="js/entities/grenade.js"></script>
-
-<script src="js/ui/hud.js"></script>
-<script src="js/systems/input.js"></script>
-<script src="js/systems/settings.js"></script>
-<script src="js/systems/shooting.js"></script>
-<script src="js/systems/damage.js"></script>
-<script src="js/systems/player_update.js"></script>
-<script src="js/systems/vm_anim.js"></script>
-<script src="js/systems/camera.js"></script>
-
-<script src="js/ui/shop.js"></script>
-<script src="js/game/flow.js"></script>
-<script src="js/game/intro.js"></script>
-<script src="js/game/waves.js"></script>
-<script src="js/ui/esp.js"></script>
-<script src="js/main.js"></script>
-<script src="music.js"></script>
-<script src="announcement.js"></script>
+    // 2. 用最原始的 document.write 同步加载，手机浏览器绝不拦截
+    for (const src of scripts) {
+      if (blockedScripts.includes(src)) {
+        console.error(`⛔ [DEV CONSOLE] 已成功阻止加载模块: ${src}`);
+        continue;
+      }
+      document.write(`<script src="${src}"><\/script>`);
+    }
+  })();
+</script>
 
 
 
+<script>
+  // 当所有同步脚本加载完毕，进度条满格并淡出
+  window.addEventListener('load', function() {
+    if (window.__loadTimer) clearInterval(window.__loadTimer);
+    
+    const barFill = document.getElementById('loadBarFill');
+    const pctEl = document.getElementById('loadPercent');
+    if (barFill) {
+      barFill.style.transition = 'width 0.2s ease-out';
+      barFill.style.width = '100%';
+    }
+    if (pctEl) pctEl.textContent = '100%';
+
+    setTimeout(function() {
+      const loadEl = document.getElementById('loadScreen');
+      if (loadEl) {
+        loadEl.style.transition = 'opacity 0.35s ease-out';
+        loadEl.style.opacity = '0';
+        setTimeout(function() {
+          if (loadEl && loadEl.parentNode) loadEl.parentNode.removeChild(loadEl);
+        }, 400);
+      }
+    }, 300);
+  });
+</script>
 </body>
 <!-- 闪光弹白屏遮罩 -->
 <div id="flashOverlay"></div>

@@ -9,9 +9,6 @@
 
 /* --------------------------------------------------------------------------
    错误兜底 —— 任何未捕获异常直接打到屏幕底部
-
-   输出格式：`⛔ 文件名:行号 — 错误信息`
-   文件名带后缀，方便定位是哪个模块出了问题。
    -------------------------------------------------------------------------- */
 (function(){
   const box = document.getElementById('err');
@@ -32,11 +29,19 @@
   }
 
   window.addEventListener('error', e => {
-    show(`⛔ ${shortSrc(e.filename)}:${e.lineno} — ${e.message}`);
-  });
-  window.addEventListener('unhandledrejection', e => {
-    show(`⛔ promise — ${e.reason && e.reason.message ? e.reason.message : e.reason}`);
-  });
+  // 如果控制台开启了屏蔽，直接跳过
+  if (window.__hideErrUI) return;
+  // 忽略音频文件找不到的报错，防止刷屏
+  if (e.message && e.message.includes('no supported source')) return;
+  show(`⛔ ${shortSrc(e.filename)}:${e.lineno} — ${e.message}`);
+});
+
+window.addEventListener('unhandledrejection', e => {
+  if (window.__hideErrUI) return;
+  const msg = e.reason && e.reason.message ? e.reason.message : String(e.reason);
+  if (msg.includes('no supported source') || msg.includes('play() failed')) return;
+  show(`⛔ promise — ${msg}`);
+});
 })();
 
 if (typeof THREE === 'undefined') {
@@ -52,27 +57,22 @@ const clamp = THREE.MathUtils.clamp;
 const lerp  = THREE.MathUtils.lerp;
 const PI    = Math.PI;
 
-/* perfNow 是一个每帧被主循环更新的全局时间戳（毫秒）。
-   其他模块（例如敌 AI 冷却、门控逻辑）直接读取它，不再各自调用 performance.now()。 */
 let perfNow = performance.now();
 
 const rand  = (a, b)  => a + Math.random() * (b - a);
 const randI = (a, b)  => Math.floor(rand(a, b + 1));
 const pick  = arr     => arr[(Math.random() * arr.length) | 0];
 
-/* 帧率无关的指数平滑：lambda 越大越快贴合目标 */
 const damp = (cur, tgt, lambda, dt) => lerp(cur, tgt, 1 - Math.exp(-lambda * dt));
 
 const easeOutCubic   = t => 1 - Math.pow(1 - t, 3);
 const easeInOutCubic = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 
 /* --------------------------------------------------------------------------
-   色彩空间：所有硬编码 hex 都按 sRGB 书写（人能看懂的色值），
-   而 three 的 material.color 是线性空间，直接塞进去会亮得发飘。
+   色彩空间
    -------------------------------------------------------------------------- */
 const sRGB = hex => new THREE.Color(hex).convertSRGBToLinear();
 
-/** 批量把字典里所有材质的 color / emissive 从 sRGB 转到线性。 */
 function linearizeMats(dict){
   for (const k in dict){
     const m = dict[k];
@@ -84,9 +84,6 @@ function linearizeMats(dict){
 
 /* --------------------------------------------------------------------------
    几何合并
-
-   three r128 不带 BufferGeometryUtils 插件，合并静态几何（围栏、炮塔零件、
-   场景装饰等）只能手写。此函数要求所有传入几何共享同一个材质。
    -------------------------------------------------------------------------- */
 function mergeGeoms(list){
   const geos = list.map(g => g.index ? g.toNonIndexed() : g);
@@ -116,27 +113,17 @@ function mergeGeoms(list){
 
 /* --------------------------------------------------------------------------
    便捷的几何/材质构造器
-
-   B/CYL/CYLZ 在武器、敌人、炮塔等模型文件里被反复使用，
-   写在这里省得每个文件重复声明一遍。
    -------------------------------------------------------------------------- */
 const B    = (w, h, d) => new THREE.BoxGeometry(w, h, d);
 const CYL  = (r1, r2, h, s) => new THREE.CylinderGeometry(r1, r2, h, s || 10);
 const CYLZ = (r1, r2, h, s) => { const g = CYL(r1, r2, h, s); g.rotateX(PI / 2); return g; };
 
-/** 开口圆管（沿 Z 轴）—— 用于望远镜 / 瞄具的镜筒，需要能从内部看穿 */
 const TUBEZ = (r, h, s) => {
   const g = new THREE.CylinderGeometry(r, r, h, s || 16, 1, true);
   g.rotateX(PI / 2);
   return g;
 };
 
-/* --------------------------------------------------------------------------
-   装配 part()：把一段几何挂到父节点上，同时设置位置/旋转/缩放
-
-   这是模型构建文件（武器、敌人、炮塔）里出现频率最高的调用，
-   集中在这里既保证一致性，也方便后续统一调整。
-   -------------------------------------------------------------------------- */
 function part(parent, geo, mat, x, y, z, rx, ry, rz, sx, sy, sz){
   const m = new THREE.Mesh(geo, mat);
   m.position.set(x || 0, y || 0, z || 0);
@@ -148,8 +135,6 @@ function part(parent, geo, mat, x, y, z, rx, ry, rz, sx, sy, sz){
 
 /* --------------------------------------------------------------------------
    2D 画布与贴图工具
-
-   项目里所有贴图都是程序化 Canvas 生成的，这两个函数是它们的公共入口。
    -------------------------------------------------------------------------- */
 function cvs(size){
   const c = document.createElement('canvas');
