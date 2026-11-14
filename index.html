@@ -822,6 +822,60 @@
           </div>
         </a>
 
+        <!-- 射击 -->
+        <a class="project-card"
+           href="./shooter/index.html"
+           target="_blank" rel="noopener noreferrer">
+          <div class="project-top">
+            <div class="pt-title">
+              <h3>射击</h3>
+              <span class="state"><i></i>可运行</span>
+            </div>
+            <span class="go" aria-hidden="true">↗</span>
+          </div>
+          <p>
+            第一人称射击玩法。移动、瞄准、开火，
+            用指针锁定控制视角，纯前端运行。
+          </p>
+          <div class="meta">
+            <span class="mini-tag">Three.js</span>
+            <span class="mini-tag">JavaScript</span>
+            <span class="mini-tag">Pointer Lock</span>
+          </div>
+          <div class="file-list">
+            <span class="folder">📁 shooter/</span>
+            <span class="file">index.html</span>
+            <span class="file">等</span>
+          </div>
+        </a>
+
+        <!-- 飞车 -->
+        <a class="project-card"
+           href="./racing/index.html"
+           target="_blank" rel="noopener noreferrer">
+          <div class="project-top">
+            <div class="pt-title">
+              <h3>飞车</h3>
+              <span class="state"><i></i>可运行</span>
+            </div>
+            <span class="go" aria-hidden="true">↗</span>
+          </div>
+          <p>
+            浏览器里的飞车体验。加速、转向、漂移，
+            在 3D 场景中跑起来。
+          </p>
+          <div class="meta">
+            <span class="mini-tag">Three.js</span>
+            <span class="mini-tag">JavaScript</span>
+            <span class="mini-tag">WebGL</span>
+          </div>
+          <div class="file-list">
+            <span class="folder">📁 racing/</span>
+            <span class="file">index.html</span>
+            <span class="file">等</span>
+          </div>
+        </a>
+
       </div>
 
       <a class="more-link"
@@ -877,13 +931,17 @@
 
 <footer>
   <div class="wrap">
-    <p>© 2025 Airplane</p>
+    <p>© <span id="year">2026</span> Airplane</p>
     <p><a href="#">回到顶部 ↑</a></p>
   </div>
 </footer>
 
 <script>
   (function () {
+    /* ---------- 页脚年份：自动取当前年份 ---------- */
+    var yearEl = document.getElementById('year');
+    if (yearEl) yearEl.textContent = new Date().getFullYear();
+
     /* ---------- 主题切换 ---------- */
     var root = document.documentElement;
     var btn = document.getElementById('themeToggle');
